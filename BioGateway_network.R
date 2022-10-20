@@ -2,17 +2,26 @@ library(tidyverse)
 
 setwd("C:/Users/Legion/Downloads")
 
+if ("Swiss_Prot.tsv" %in% dir()) {
+  swiss_prot <- read.delim("Swiss_Prot.tsv")  
+} else {
+  cat("OBS! The file is not in working directory. Fetching it from web, but it takes a while")
+  swiss_prot <- read.delim("https://rest.uniprot.org/uniprotkb/stream?fields=accession%2Cid%2Cprotein_name%2Cgene_names&format=tsv&query=%28reviewed%3Atrue%29%20AND%20%28model_organism%3A9606%29")
+}
+
+
 data1 <- read.csv("nodes.csv")
 data2 <- read.csv("edges.csv")
 data3 <- read.csv("Marius_edges_test.csv")
 
-str_rev <- function(string) {
-  splt_str <- strsplit(string, NULL)[[1]]
-  rev_str <- paste(rev(splt_str), collapse = "")
-  
-  return(rev_str)
-}
+# str_rev <- function(string) {
+#   splt_str <- strsplit(string, NULL)[[1]]
+#   rev_str <- paste(rev(splt_str), collapse = "")
+#   
+#   return(rev_str)
+# }
 
+# Function to reverse all elements in a character column:
 str_rev_in_vec <- function(vec) {
   vec <- vec %>% 
     strsplit(NULL) %>% 
@@ -24,61 +33,9 @@ str_rev_in_vec <- function(vec) {
 
 
 
-source_target_int <- function(row, df=data3) {
-  org <- df$Edge.Id[row]
-  int <- df$Source.Graph[row]
-  
-  # Source:
-  cut1 <- org %>% 
-    str_locate(., 
-               str_c(";", 
-                     int)) %>% 
-    .[1]-1
-  
-  new <- org %>% str_sub(end = cut1)
-  
-  cut2 <- new %>%
-    str_rev() %>% 
-    str_locate("/") %>% 
-    .[1]-1
-  
-  source <- new %>% 
-    str_rev() %>% 
-    str_sub(end = cut2) %>% 
-    str_rev()
-  
-  
-  # Target:
-  
-  cut3 <- org %>% 
-    str_rev() %>% 
-    str_locate("/") %>% 
-    .[1]-1
-  
-  df$target <- org %>%
-    str_rev() %>% 
-    str_sub(end = cut3) %>% 
-    str_rev()
-  
-  return(c(source, df$target, int))
-  
-}
-
-a <- source_target_int(1)
-b <- data1 %>% 
-  select(id, UniprotKB) %>% 
-  filter(id == a[1]) %>% 
-  select(UniprotKB) %>%
-  .[1]
-
-if (a[2] == b) {
-  cat("TRUE")
-} else {
-  cat("FALSE")
-}
-
-
-df_source_target_int <- function(df=data3) {
+## Reads a BioGateway network's edge table. 
+## Returns a df of only source, target and interaction:
+read_BioGateway <- function(df) {
   org <- df$Edge.Id
   int <- df$Source.Graph
   
@@ -115,49 +72,32 @@ df_source_target_int <- function(df=data3) {
     str_rev_in_vec()
   
   
-  return(cbind.data.frame(unlist(source), unlist(target), unlist(int)))
+  df <- cbind.data.frame(
+    "source"=unlist(source),
+    "target"=unlist(target),
+    "int"=unlist(int)
+  )
+  
+  return(df)
 }
 
 
-a <- df_source_target_int() %>% filter(source == "IL1R1")
 
 
 
 
-cut1 <- data3$Edge.Id %>% 
-  str_locate(.,
-             str_c(";",
-                   data3$Source.Graph)) %>% 
-  .[,1]-1
-cut1
+# Test
+a <- read_BioGateway(data3) 
 
-new <- data3$Edge.Id %>% str_sub(end = cut1)
-new
+b <- a %>% 
+  filter(
+    target %in% swiss_prot$Entry
+    )
+  
 
-cut2 <- new %>%
-  str_rev_in_vec() %>% 
-  str_locate("/") %>% 
-  .[,1]-1
-cut2
+b <- a %>% 
+  filter(int == "gene") %>% 
+  filter(source == "IRAK1") %>%
+  filter(target %in% swiss_prot$Entry)
 
 
-source <- new %>% 
-  str_rev_in_vec() %>% 
-  str_sub(end = cut2) %>% 
-  str_rev_in_vec()
-source
-
-
-cut3 <- data3$Edge.Id %>% 
-  str_rev_in_vec() %>% 
-  str_locate("/") %>% 
-  .[,1]-1
-cut3
-
-target <- data3$Edge.Id %>%
-  str_rev_in_vec() %>% 
-  str_sub(end = cut3) %>% 
-  str_rev_in_vec()
-target
-
-a <- unlist(source)

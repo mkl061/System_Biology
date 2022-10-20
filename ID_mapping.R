@@ -9,7 +9,12 @@ setwd("C:/Users/Legion/Downloads")
 # API URL for ALL human proteins in the Swiss-Prot database:
 # https://rest.uniprot.org/uniprotkb/stream?fields=accession%2Cid%2Cprotein_name%2Cgene_names&format=tsv&query=%28reviewed%3Atrue%29%20AND%20%28model_organism%3A9606%29
 
-swiss_prot <- read.delim("Swiss.tsv")
+if ("Swiss_Prot.tsv" %in% dir()) {
+  swiss_prot <- read.delim("Swiss_Prot.tsv")  
+} else {
+  cat("OBS! The Swiss_Prot file is not in working directory. Fetching it from web, but it takes a while")
+  swiss_prot <- read.delim("https://rest.uniprot.org/uniprotkb/stream?fields=accession%2Cid%2Cprotein_name%2Cgene_names&format=tsv&query=%28reviewed%3Atrue%29%20AND%20%28model_organism%3A9606%29")
+}
 
 ## Your spreadsheet:
 #dat <- read.csv("original_set.csv")
@@ -26,7 +31,7 @@ for (col_ind in 1:ncol(dat)) {
 
 ID_mapping <- function(from, to, df, keys_column, from_column) {
   ## Uniprot IDs given when mapping by "gene symbol":
-  uni_first <- mapIds(org.Hs.eg.db,
+  ids_from_db <- mapIds(org.Hs.eg.db,
                       #keys = df$id,
                       keys = unlist(df[keys_column]),
                       column = to,
@@ -36,12 +41,19 @@ ID_mapping <- function(from, to, df, keys_column, from_column) {
   
   # We usually start by finding Uniprot IDs!
   if (to == "UNIPROT") {
-    swiss_prot <- read.delim("https://rest.uniprot.org/uniprotkb/stream?fields=accession%2Cid%2Cprotein_name%2Cgene_names&format=tsv&query=%28reviewed%3Atrue%29%20AND%20%28model_organism%3A9606%29")
+    # Checks if the Swiss_Prot.tsv file is in the directory.
+    # If not, gets it from the web via API URL:
+    if ("Swiss_Prot.tsv" %in% dir()) {
+      swiss_prot <- read.delim("Swiss_Prot.tsv")  
+    } else {
+      cat("OBS! The Swiss_Prot file is not in working directory. Fetching it from web, but it takes a while")
+      swiss_prot <- read.delim("https://rest.uniprot.org/uniprotkb/stream?fields=accession%2Cid%2Cprotein_name%2Cgene_names&format=tsv&query=%28reviewed%3Atrue%29%20AND%20%28model_organism%3A9606%29")
+    }
     
     
-    for (lst_ind in 1:length(uni_first)) { # List index val
+    for (lst_ind in 1:length(ids_from_db)) { # List index val
       new_vec <- vector() # Empty vector
-      for (vec_elm in uni_first[[lst_ind]]) { # Elements of the list-element
+      for (vec_elm in ids_from_db[[lst_ind]]) { # Elements of the list-element
         if (vec_elm %in% swiss_prot$Entry == T) { # Checks if element (i.e. Uniprot ID) is in Swiss-Prot (i.e. is it reviewed by expert)
           new_vec <- append(new_vec, vec_elm) # Adds the element to the vector
         }
@@ -51,19 +63,25 @@ ID_mapping <- function(from, to, df, keys_column, from_column) {
         new_vec <- NA
       }
       
-      uni_first[[lst_ind]] <- new_vec
+      ids_from_db[[lst_ind]] <- new_vec
       
     }
   }
   
+  ##############################################################################
+  # OBS! It is missing some lines of code HERE!
+  # Because the next line of code only works if all the list elements only
+  # containt 1 element each! Which it seems to do for Swiss-Prot
+  ##############################################################################
+  
   
   ## Unlist the list:
-  uni_first <- unlist(uni_first)
+  ids_from_db <- unlist(ids_from_db)
   
   
   tabl_check <- df %>% 
     dplyr::select("id"=!!sym(keys_column), "Our_ID"=!!sym(from_column)) %>% 
-    add_column("Mapping_ID" = uni_first) %>% 
+    add_column("Mapping_ID" = ids_from_db) %>% 
     mutate(final = ifelse(Our_ID == "", # Is Our_ID an empty string?
                           Mapping_ID, # Yes; Set as the ID gotten from ID mapping
                           ifelse(is.na(Our_ID),  # No; Initiate another ifelse(). Is Our_ID a NA?
@@ -73,7 +91,7 @@ ID_mapping <- function(from, to, df, keys_column, from_column) {
                           )
           )
   
-  df$UniprotKB <- tabl_check$final
+  df[from_column] <- tabl_check$final
   
   return(df)
 }
@@ -87,16 +105,16 @@ View(ID_mapping("UNIPROT", "SYMBOL", dat, keys_column = "UniprotKB", from_column
 
 
 ## Uniprot IDs given when mapping by "gene symbol":
-uni_first <- mapIds(org.Hs.eg.db,
+ids_from_db <- mapIds(org.Hs.eg.db,
               keys = dat$id,
               column = "UNIPROT",
               keytype = "SYMBOL",
               multiVals = "list") # A gene symbol may refer to multiple IDs (return a vector of these)
 
 
-## Given that uni_first is a list, we need to find a single identifier for
+## Given that ids_from_db is a list, we need to find a single identifier for
 ## each protein before we can turn the list into a vector:
-uni_sec <- uni_first
+uni_sec <- ids_from_db
 
 
 for (lst_ind in 1:length(uni_sec)) {
