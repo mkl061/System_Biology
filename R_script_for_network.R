@@ -35,8 +35,6 @@ edges <- read.csv("edges.csv", sep = ",", header = T, stringsAsFactors = F)
 colnames(edges)[1] <- "source"
 colnames(edges)[2] <- "target"
 
-#### OBS temporarily!!
-edges <- edges[1:124,]# %>% select(source, target)
 
 # Check for uniqueness:
 n_un <- unique(nodes$id)
