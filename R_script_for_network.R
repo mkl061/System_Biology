@@ -8,7 +8,7 @@ is_installed <- function(package_id) {
   }
 }
 
-# Checks if the pakckages are installed, and installs them if not:
+# Checks if the packages are installed, and installs them if not:
 is_installed("tidyverse")
 is_installed("BiocManager")
 
