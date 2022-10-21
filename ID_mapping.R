@@ -1,8 +1,34 @@
+is_installed <- function(package_id) {
+  pacs <- installed.packages()[ , "Package"]
+  if (!(package_id %in% pacs)) {
+    install.packages(package_id)
+  } else {
+    cat("The package is installed")
+    return(T)
+  }
+}
+
+is_installed("tidyverse")
 library(tidyverse)
+
+is_installed("BiocManager")
+
+
+if (is_installed("org.Hs.eg.db")) {
+} else {
+  BiocManager::install("org.Hs.eg.db")
+}
+library(org.Hs.eg.db)
+
+if (is_installed("biomartr")) {
+} else {
+  BiocManager::install("biomartr")
+}
+library(biomartr)
+
 
 
 #BiocManager::install("org.Hs.eg.db")
-library(org.Hs.eg.db)
 
 
 setwd("C:/Users/Legion/Downloads")
