@@ -1,86 +1,28 @@
+### Package handling ----
+# Tidyverse:
 if (!require("tidyverse", quietly = T)) {
   install.packages("tidyverse")
 }
 
+# Bioconductor (i.e. BiocManager):
+if (!require("BiocManager", quietly = T)) {
+  install.packages("BiocManager")
+}
+BiocManager::install(update = T, ask = F, quietly = T)
 
-
-pacs_in_library <- installed.packages()[ , "Package"]
-wanted_pacs <- c("tidyverse", "BiocManager")
-
-if (all(wanted_pacs %in% pacs_in_library) == F) {
-  for (pac in setdiff(pacs_in_library, wanted_pacs)) {
-    install.packages(pac, dependencies = T, quiet = T)
-  }
+# Biomartr:
+if (!require("biomartr", quietly = T)) {
+  BiocManager::install("Biostrings", update = T, ask = F, force = T)
+  BiocManager::install("biomaRt", update = T, ask = F)
+  
+  install.packages("biomartr", dependencies = T)
 }
 
-pacs_from_BiocManager <- c("Biostrings", "biomaRt", "org.Hs.eg.db")
+# Human data base:
+BiocManager::install("org.Hs.eg.db")
 
-### Package handling ----
 
-print_foo <- function(string, ...) {
-  cat(string, ..., sep = "")
-}
 
-a <- "Marius"
-b <- "Mirja"
-print_foo("My name is ", b)
-
-# Function to check if package is installed. Installs if not.
-is_installed <- function(package_id) {
-  pacs <- installed.packages()[ , "Package"]
-  if (!(package_id %in% pacs)) {
-    install.packages(package_id, dependencies = T, quiet = T)
-  } else {
-    if (package_id == "BiocManager") {
-      cat("The package is installed.")
-    } else {
-      cat("The package is installed. Loading package")
-      library(package_id)
-    }
-  }
-}
-
-from_BiocManager <- c("Biostrings", "biomaRt", "org.Hs.eg.db")
-direct_install <- c("tidyverse", "BiocManager", "biomartr")
-
-foo <- function(package_id) {
-  if (package_id %in% from_BiocManager) {
-    
-  }
-}
-
-# Tidyverse:
-is_installed("tidyverse")
-#library(tidyverse)
-
-# BiocManager (Overall package):
-is_installed("BiocManager")
-
-# org.Hs.eg.db from BiocManager (i.e. human data base):
-is_installed("org.Hs.eg.db")
-
-# if (is_installed("org.Hs.eg.db")) {
-# } else {
-#   BiocManager::install("org.Hs.eg.db")
-# }
-# library(org.Hs.eg.db)
-
-# biomartr from BiocManager (i.e. Ensmbl BioMart from R):
-if (is_installed("Biostrings")) {
-} else {
-  BiocManager::install("Biostrings")
-}
-if (is_installed("biomaRt")) {
-} else {
-  BiocManager::install("biomaRt")
-}
-
-BiocManager::install("Biostrings", )
-BiocManager::install("biomaRt")
-install.packages("biomartr", dependencies = TRUE)
-
-is_installed("biomartr", dependencies = TRUE)
-library(biomartr)
 
 
 ### Working directory ----
