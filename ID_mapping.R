@@ -1,37 +1,95 @@
-is_installed <- function(package_id) {
-  pacs <- installed.packages()[ , "Package"]
-  if (!(package_id %in% pacs)) {
-    install.packages(package_id)
-  } else {
-    cat("The package is installed")
-    return(T)
+if (!require("tidyverse", quietly = T)) {
+  install.packages("tidyverse")
+}
+
+
+
+pacs_in_library <- installed.packages()[ , "Package"]
+wanted_pacs <- c("tidyverse", "BiocManager")
+
+if (all(wanted_pacs %in% pacs_in_library) == F) {
+  for (pac in setdiff(pacs_in_library, wanted_pacs)) {
+    install.packages(pac, dependencies = T, quiet = T)
   }
 }
 
-is_installed("tidyverse")
-library(tidyverse)
+pacs_from_BiocManager <- c("Biostrings", "biomaRt", "org.Hs.eg.db")
 
+### Package handling ----
+
+print_foo <- function(string, ...) {
+  cat(string, ..., sep = "")
+}
+
+a <- "Marius"
+b <- "Mirja"
+print_foo("My name is ", b)
+
+# Function to check if package is installed. Installs if not.
+is_installed <- function(package_id) {
+  pacs <- installed.packages()[ , "Package"]
+  if (!(package_id %in% pacs)) {
+    install.packages(package_id, dependencies = T, quiet = T)
+  } else {
+    if (package_id == "BiocManager") {
+      cat("The package is installed.")
+    } else {
+      cat("The package is installed. Loading package")
+      library(package_id)
+    }
+  }
+}
+
+from_BiocManager <- c("Biostrings", "biomaRt", "org.Hs.eg.db")
+direct_install <- c("tidyverse", "BiocManager", "biomartr")
+
+foo <- function(package_id) {
+  if (package_id %in% from_BiocManager) {
+    
+  }
+}
+
+# Tidyverse:
+is_installed("tidyverse")
+#library(tidyverse)
+
+# BiocManager (Overall package):
 is_installed("BiocManager")
 
+# org.Hs.eg.db from BiocManager (i.e. human data base):
+is_installed("org.Hs.eg.db")
 
-if (is_installed("org.Hs.eg.db")) {
-} else {
-  BiocManager::install("org.Hs.eg.db")
-}
-library(org.Hs.eg.db)
+# if (is_installed("org.Hs.eg.db")) {
+# } else {
+#   BiocManager::install("org.Hs.eg.db")
+# }
+# library(org.Hs.eg.db)
 
-if (is_installed("biomartr")) {
+# biomartr from BiocManager (i.e. Ensmbl BioMart from R):
+if (is_installed("Biostrings")) {
 } else {
-  BiocManager::install("biomartr")
+  BiocManager::install("Biostrings")
 }
+if (is_installed("biomaRt")) {
+} else {
+  BiocManager::install("biomaRt")
+}
+
+BiocManager::install("Biostrings", )
+BiocManager::install("biomaRt")
+install.packages("biomartr", dependencies = TRUE)
+
+is_installed("biomartr", dependencies = TRUE)
 library(biomartr)
 
 
+### Working directory ----
+if (Sys.info()[1] == "Linux") {
+  setwd("/mnt/chromeos/MyFiles/Downloads")
+} else if (Sys.info()[1] == "Windows") {
+  setwd("C:/Users/Legion/Downloads")
+}
 
-#BiocManager::install("org.Hs.eg.db")
-
-
-setwd("C:/Users/Legion/Downloads")
 # API URL for ALL human proteins in the Swiss-Prot database:
 # https://rest.uniprot.org/uniprotkb/stream?fields=accession%2Cid%2Cprotein_name%2Cgene_names&format=tsv&query=%28reviewed%3Atrue%29%20AND%20%28model_organism%3A9606%29
 
