@@ -1,12 +1,12 @@
 ### Package handling ----
 # Tidyverse:
 if (!require("tidyverse", quietly = T)) {
-  install.packages("tidyverse")
+  install.packages("tidyverse", quiet = T)
 }
 
 # Bioconductor (i.e. BiocManager):
 if (!require("BiocManager", quietly = T)) {
-  install.packages("BiocManager")
+  install.packages("BiocManager", quiet = T)
 }
 BiocManager::install(update = T, ask = F, quietly = T)
 
@@ -15,17 +15,18 @@ if (!require("biomartr", quietly = T)) {
   BiocManager::install("Biostrings", update = T, ask = F, force = T)
   BiocManager::install("biomaRt", update = T, ask = F)
   
-  install.packages("biomartr", dependencies = T)
+  install.packages("biomartr", dependencies = T, quiet = T)
 }
 
 # Human data base:
 BiocManager::install("org.Hs.eg.db")
 
 
+install.packages("systemfonts", quiet=T, dependencies = T)
+"ragg"
+install.packages("pkgdown", quiet = T, dependencies = T)
 
-
-
-### Working directory ----
+  ### Working directory ----
 if (Sys.info()[1] == "Linux") {
   setwd("/mnt/chromeos/MyFiles/Downloads")
 } else if (Sys.info()[1] == "Windows") {
