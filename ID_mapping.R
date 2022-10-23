@@ -8,7 +8,7 @@ if (!require("tidyverse", quietly = T)) {
 if (!require("BiocManager", quietly = T)) {
   install.packages("BiocManager", quiet = T)
 }
-BiocManager::install(update = T, ask = F, quietly = T)
+BiocManager::install(update = T, ask = F, ... = c(quiet = T))
 
 # Biomartr:
 if (!require("biomartr", quietly = T)) {
@@ -32,6 +32,64 @@ if (Sys.info()[1] == "Linux") {
 } else if (Sys.info()[1] == "Windows") {
   setwd("C:/Users/Legion/Downloads")
 }
+
+
+
+
+input_data <- read.csv("nodes.csv")
+
+for (col_ind in 1:ncol(input_data)) {
+  if (is.character(input_data[,col_ind])) {
+    input_data[,col_ind] <- sapply(input_data[,col_ind], str_trim)
+  }
+}
+
+listEnsembl()
+ensembl <- useEnsembl(biomart = "genes")
+datasets <- listDatasets(ensembl)
+
+ensembl.con <- useMart("ensembl", dataset = "hsapiens_gene_ensembl")
+
+attributes <- listAttributes(ensembl.con)
+filters <- listFilters(ensembl.con)
+
+getBM(attributes = c("uniprotswissprot", "ensembl_gene_id"),
+      filters = "uniprotswissprot",
+      values = input_data$UniprotKB,
+      mart = ensembl.con) %>% 
+  add_column("dupl"=duplicated(.[,1])) %>% 
+  filter("dupl" != F) %>% View()
+
+a <- input_data %>% dplyr::select(id, UniprotKB) %>% filter(UniprotKB != "") %>% unique()
+b <- getBM(attributes = c(
+  "uniprotswissprot", 
+  "entrezgene_id", 
+  "external_gene_name",
+  "external_synonym"),
+      filters = "uniprotswissprot",
+      values = input_data$UniprotKB,
+      mart = ensembl.con)
+c <- left_join(a, b, by=c("UniprotKB" = "uniprotswissprot"))
+
+input_data <- input_data %>% filter(id != "CHUK") %>% filter(UniprotKB != "")
+
+new_df <- input_data %>% dplyr::select(UniprotKB)
+new_df$new <- NA
+for (u_id in new_df$UniprotKB) {
+  vec <- b %>% 
+    filter(uniprotswissprot == u_id) %>%
+    dplyr::select(external_synonym) %>% 
+    as.vector() %>% 
+    unlist() %>%
+    paste0(collapse = "|")
+  
+  new_df$new[new_df$UniprotKB == u_id] <- vec
+}
+
+
+b <- input_data %>% dplyr::select(UniprotKB) %>% filter(UniprotKB != "") %>% nrow()#%>% as.vector() %>% unlist()
+
+
 
 # API URL for ALL human proteins in the Swiss-Prot database:
 # https://rest.uniprot.org/uniprotkb/stream?fields=accession%2Cid%2Cprotein_name%2Cgene_names&format=tsv&query=%28reviewed%3Atrue%29%20AND%20%28model_organism%3A9606%29
