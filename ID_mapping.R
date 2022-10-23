@@ -1,8 +1,4 @@
 ### Package handling ----
-# Tidyverse:
-if (!require("tidyverse", quietly = T)) {
-  install.packages("tidyverse", quiet = T)
-}
 
 # Bioconductor (i.e. BiocManager):
 if (!require("BiocManager", quietly = T)) {
@@ -10,23 +6,30 @@ if (!require("BiocManager", quietly = T)) {
 }
 BiocManager::install(update = T, ask = F, ... = c(quiet = T))
 
-# Biomartr:
-if (!require("biomartr", quietly = T)) {
-  BiocManager::install("Biostrings", update = T, ask = F, force = T)
-  BiocManager::install("biomaRt", update = T, ask = F)
-  
-  install.packages("biomartr", dependencies = T, quiet = T)
+
+# # Biomartr:
+# if (!require("biomartr", quietly = T)) {
+#   BiocManager::install("Biostrings", update = T, ask = F, force = T)
+#   BiocManager::install("biomaRt", update = T, ask = F)
+#   
+#   install.packages("biomartr", dependencies = T, quiet = T)
+# }
+
+if (!require("biomaRt", quietly = T)) {
+  install.packages("biomaRt", quiet = T)
 }
 
 # Human data base:
-BiocManager::install("org.Hs.eg.db")
+BiocManager::install("org.Hs.eg.db", force = T)
 
 
-install.packages("systemfonts", quiet=T, dependencies = T)
-"ragg"
-install.packages("pkgdown", quiet = T, dependencies = T)
+# Tidyverse:
+if (!require("tidyverse", quietly = T)) {
+  install.packages("tidyverse", quiet = T)
+}
 
-  ### Working directory ----
+
+### Working directory ----
 if (Sys.info()[1] == "Linux") {
   setwd("/mnt/chromeos/MyFiles/Downloads")
 } else if (Sys.info()[1] == "Windows") {
@@ -34,72 +37,162 @@ if (Sys.info()[1] == "Linux") {
 }
 
 
+### Custom function ----
+# Splits apart a string at "|", removes duplicates, and splice it together again:
+str_rm_duplicates <- function(string) {
+  string <- string %>% 
+    str_split(pattern = "\\|") %>%
+    unlist() %>% 
+    base::unique() %>% 
+    paste0(collapse = "|")
+  return(string)
+}
 
 
+
+### Input data ----
+# Read files:
 input_data <- read.csv("nodes.csv")
 
-for (col_ind in 1:ncol(input_data)) {
-  if (is.character(input_data[,col_ind])) {
-    input_data[,col_ind] <- sapply(input_data[,col_ind], str_trim)
+# Tidy up the file by removing unwanted white spaces:
+for (col in 1:ncol(input_data)) {
+  if (is.character(input_data[,col])) { # Checks if column is of character type
+    input_data[,col] <- sapply(input_data[,col], 
+                                   str_squish) # Removes white spaces in front, back and reduce multiple spaces to a single one
+    #input_data[,col] <- sapply(input_data[,col], str_trim)
   }
 }
 
-listEnsembl()
-ensembl <- useEnsembl(biomart = "genes")
-datasets <- listDatasets(ensembl)
 
+
+### IDs with biomaRt ----
+# listEnsembl()
+# ensembl <- useEnsembl(biomart = "genes")
+# datasets <- listDatasets(ensembl)
+
+# Use only entries from Homo sapiens:
 ensembl.con <- useMart("ensembl", dataset = "hsapiens_gene_ensembl")
 
-attributes <- listAttributes(ensembl.con)
-filters <- listFilters(ensembl.con)
+# attributes <- listAttributes(ensembl.con)
+# filters <- listFilters(ensembl.con)
 
-getBM(attributes = c("uniprotswissprot", "ensembl_gene_id"),
+# Get IDs from other data bases, using the biomaRt package:
+# OBS! This data frame will contain duplications, because
+# some proteins may have multiple IDs within the same data bases.
+multiple_ids <- getBM(attributes = c(
+  "uniprotswissprot", # Uniprot ID, from the Swiss-Prot data base
+  "entrezgene_id", # I.e. NCBI gene ID
+  "external_gene_name", 
+  "external_synonym",
+  "hgnc_id"), # HGCN ID
       filters = "uniprotswissprot",
       values = input_data$UniprotKB,
-      mart = ensembl.con) %>% 
-  add_column("dupl"=duplicated(.[,1])) %>% 
-  filter("dupl" != F) %>% View()
+      mart = ensembl.con) #%>% 
+  #add_column("dupl"=duplicated(.[,1])) %>% 
+  #filter(dupl != T) #%>% View()
 
-a <- input_data %>% dplyr::select(id, UniprotKB) %>% filter(UniprotKB != "") %>% unique()
-b <- getBM(attributes = c(
-  "uniprotswissprot", 
-  "entrezgene_id", 
-  "external_gene_name",
-  "external_synonym"),
-      filters = "uniprotswissprot",
-      values = input_data$UniprotKB,
-      mart = ensembl.con)
-c <- left_join(a, b, by=c("UniprotKB" = "uniprotswissprot"))
 
-input_data <- input_data %>% filter(id != "CHUK") %>% filter(UniprotKB != "")
-
+# Create a new df with removal of duplicates:
 new_df <- input_data %>% dplyr::select(UniprotKB)
 new_df$new <- NA
-for (u_id in new_df$UniprotKB) {
-  vec <- b %>% 
-    filter(uniprotswissprot == u_id) %>%
+for (row in new_df$UniprotKB) {
+  vec <- multiple_ids %>% 
+    filter(uniprotswissprot == row) %>%
     dplyr::select(external_synonym) %>% 
-    as.vector() %>% 
-    unlist() %>%
+    pull() %>% 
     paste0(collapse = "|")
   
-  new_df$new[new_df$UniprotKB == u_id] <- vec
+  new_df$new[new_df$UniprotKB == row] <- vec
 }
 
-
-b <- input_data %>% dplyr::select(UniprotKB) %>% filter(UniprotKB != "") %>% nrow()#%>% as.vector() %>% unlist()
-
+a <- left_join(input_data, new_df, by=c("UniprotKB" = "UniprotKB"))
 
 
+### Find protein name and synonyms from Swiss-Prot db ----
 # API URL for ALL human proteins in the Swiss-Prot database:
-# https://rest.uniprot.org/uniprotkb/stream?fields=accession%2Cid%2Cprotein_name%2Cgene_names&format=tsv&query=%28reviewed%3Atrue%29%20AND%20%28model_organism%3A9606%29
+# https://rest.uniprot.org/uniprotkb/stream?fields=accession%2Cid%2Cprotein_name%2Cgene_names%2Cgene_synonym&format=tsv&query=%28%2A%29%20AND%20%28reviewed%3Atrue%29%20AND%20%28model_organism%3A9606%29
 
+# Checks if "Swiss_Prot.tsv" is in the working directory,
+# if not it downloads it from the Uniprots webpage:
 if ("Swiss_Prot.tsv" %in% dir()) {
   swiss_prot <- read.delim("Swiss_Prot.tsv")  
 } else {
   cat("OBS! The Swiss_Prot file is not in working directory. Fetching it from web, but it takes a while")
-  swiss_prot <- read.delim("https://rest.uniprot.org/uniprotkb/stream?fields=accession%2Cid%2Cprotein_name%2Cgene_names&format=tsv&query=%28reviewed%3Atrue%29%20AND%20%28model_organism%3A9606%29")
+  swiss_prot <- read.delim("https://rest.uniprot.org/uniprotkb/stream?fields=accession%2Cid%2Cprotein_name%2Cgene_names%2Cgene_synonym&format=tsv&query=%28%2A%29%20AND%20%28reviewed%3Atrue%29%20AND%20%28model_organism%3A9606%29")
 }
+
+
+# All the Uniprot IDs from the spreadsheet:
+Uni_ids <- input_data %>% 
+  dplyr::select(UniprotKB) %>% 
+  pull() # Results in character vector
+
+# Subset of swiss_prot df:
+sub_df <- swiss_prot %>% .[.$Entry %in% Uni_ids, ]
+
+# Create new columns:
+sub_df$protein_name <- NA
+sub_df$synonyms <- NA
+
+# Filling the new columns with protein name and synonyms:
+for (row in 1:nrow(sub_df)) { # Iterate throught all the rows
+  # Find the cell containing the preferred protein name, and synonyms:
+  string <- sub_df[row,] %>% 
+    dplyr::select(Protein.names) %>% # Focus on only the Protein.names column
+    pull() # Results in a string
+  
+  # Take the string and cuts out the preferred protein name:
+  p_name <- string %>% # Take the string
+    str_sub(
+      1, # First character 
+      str_locate(., pattern = " \\(")[1] # Ends at first " ("
+    ) 
+  
+  # Take the string not containing the preferred protein name,
+  # cut it up into the synonyms, which are covered with "( )",
+  # remove the parentheses, and return a characther vector:
+  syn <- string %>% 
+    str_sub(
+      str_locate(., pattern = "\\(")[1]+1, # starts after the first "("
+      nchar(string) # Ends at end of string
+    ) %>% 
+    str_replace_all(., pattern = "\\)", replacement = "") %>% # Replace ")"
+    str_split(., pattern = " \\(") %>% unlist()
+  
+  # Remove possible EC-number from the synonyms: 
+  if (!is.na(syn[1])) {
+    flag <- numeric(0)
+    for (i in 1:length(syn)) {
+      if (str_starts(syn[i], "EC")) {
+        flag <- base::append(flag, i)
+      }
+    }
+    
+    
+    if (length(flag > 0)) {
+      syn <- syn[-c(flag)]
+    }
+  }
+  
+  # Collapse the synonyms with the "|" between:
+  syn <- paste0(syn, collapse = "|")
+  
+  # Take the entry name (e.g. TNFA_HUMAN) and remove "_HUMAN" 
+  ent_name <- sub_df[row, "Entry.Name"] %>% 
+    str_replace(pattern = "_HUMAN", replacement = "")
+  
+  # Add the entry name to the other synonyms:
+  syn <- str_c(ent_name, syn, sep = "|")
+  
+  # Add the protein name and the synonyms to their columns:
+  sub_df[row, "protein_name"] <- p_name
+  sub_df[row, "synonyms"] <- syn
+}
+
+
+
+
+### Other ----
 
 ## Your spreadsheet:
 #dat <- read.csv("original_set.csv")
@@ -107,11 +200,14 @@ dat <- read.csv("nodes.csv")
 dat$Common_name <- dat$Common_name %>% str_replace("\xa0", "") # Fixing a recurring problem
 
 ## Trim all whitespaces in all cells with strings:
-for (col_ind in 1:ncol(dat)) {
-  if (is.character(dat[,col_ind])) {
-    dat[,col_ind] <- sapply(dat[,col_ind], str_trim)
+for (col in 1:ncol(dat)) {
+  if (is.character(dat[,col])) {
+    dat[,col] <- sapply(dat[,col], str_trim)
   }
 }
+
+
+
 
 
 ID_mapping <- function(from, to, df, keys_column, from_column) {
