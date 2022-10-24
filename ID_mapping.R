@@ -49,6 +49,17 @@ str_rm_duplicates <- function(string) {
 }
 
 
+# Function to reverse all elements in a character column:
+str_rev_in_vec <- function(vec) {
+  vec <- vec %>% 
+    strsplit(NULL) %>% 
+    lapply(rev) %>% 
+    lapply(paste, collapse = "")
+  
+  return(vec)
+}
+
+
 
 ### Input data ----
 # Read files:
@@ -190,6 +201,81 @@ for (row in 1:nrow(sub_df)) { # Iterate throught all the rows
 }
 
 
+
+### Result from BioGateway query ----
+## Reads a BioGateway network's edge table. 
+## Returns a df of only source, target and interaction:
+read_BioGateway <- function(df) {
+  org <- df$Edge.Id # http://rdf.biogateway.eu/gene/9606/IL1R1;gene::http://semanticscience.org/resource/SIO_010078;http://rdf.biogateway.eu/prot/9606/B8ZZ73
+  int <- df$Source.Graph # gene, prot2bp, or tfac2gene
+  
+  ## Source:
+  # Index of first ";":
+  cut1 <- org %>% 
+    str_locate(.,
+               str_c(";",
+                     int)) %>% 
+    .[,1]-1
+  
+  # Create a new string which drops all unwanted information
+  # until cut1 (i.e. the index number):
+  new <- org %>% 
+    str_sub(end = cut1)
+  
+  # Reveres the new string, locate the first "/" which marks
+  # the next wanted information, stores the index value:
+  cut2 <- new %>%
+    str_rev_in_vec() %>% 
+    str_locate("/") %>% 
+    .[,1]-1
+  
+  # Reverse the new string,cut all the information after cut2,
+  # and reverse the string back to normal. Results in the
+  # source node:
+  source <- new %>% 
+    str_rev_in_vec() %>% 
+    str_sub(end = cut2) %>% 
+    str_rev_in_vec()
+  
+  
+  ## Target:
+  # Reverse the original string, locate first "/", and store 
+  # the index value:
+  cut3 <- org %>% 
+    str_rev_in_vec() %>% 
+    str_locate("/") %>% 
+    .[,1]-1
+  
+  # Reverse the original string, remove the information to cut3,
+  # then reverse it back to normal:
+  target <- org %>%
+    str_rev_in_vec() %>% 
+    str_sub(end = cut3) %>% 
+    str_rev_in_vec()
+  
+  # Create a data frame with the source, tatget, and interaction type:
+  df <- cbind.data.frame(
+    "source"=unlist(source),
+    "target"=unlist(target),
+    "int"=unlist(int)
+  )
+  
+  return(df)
+}
+
+
+BG_TFs_NFKB1_and_RELA <- read.csv("Marius_edges_test.csv")
+
+res <- read_BioGateway(BG_TFs_NFKB1_and_RELA) %>% 
+  filter(int != "prot2bp") # Don't need the GO-term information
+
+genes <- res %>% 
+  filter(int == "gene") %>% 
+  filter(target %in% swiss_prot$Entry)
+
+
+a <- left_join(genes, input_data[, c("UniprotKB", "id")], 
+               by=c("target" = "UniprotKB"))
 
 
 ### Other ----

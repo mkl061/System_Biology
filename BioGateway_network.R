@@ -21,65 +21,10 @@ data3 <- read.csv("Marius_edges_test.csv")
 #   return(rev_str)
 # }
 
-# Function to reverse all elements in a character column:
-str_rev_in_vec <- function(vec) {
-  vec <- vec %>% 
-    strsplit(NULL) %>% 
-    lapply(rev) %>% 
-    lapply(paste, collapse = "")
-  
-  return(vec)
-}
 
 
 
-## Reads a BioGateway network's edge table. 
-## Returns a df of only source, target and interaction:
-read_BioGateway <- function(df) {
-  org <- df$Edge.Id
-  int <- df$Source.Graph
-  
-  # Source:
-  cut1 <- org %>% 
-    str_locate(.,
-               str_c(";",
-                     int)) %>% 
-    .[,1]-1
-  
-  new <- org %>% str_sub(end = cut1)
-  
-  cut2 <- new %>%
-    str_rev_in_vec() %>% 
-    str_locate("/") %>% 
-    .[,1]-1
-  
-  source <- new %>% 
-    str_rev_in_vec() %>% 
-    str_sub(end = cut2) %>% 
-    str_rev_in_vec()
-  
-  
-  # Target:
-  
-  cut3 <- org %>% 
-    str_rev_in_vec() %>% 
-    str_locate("/") %>% 
-    .[,1]-1
-  
-  target <- org %>%
-    str_rev_in_vec() %>% 
-    str_sub(end = cut3) %>% 
-    str_rev_in_vec()
-  
-  
-  df <- cbind.data.frame(
-    "source"=unlist(source),
-    "target"=unlist(target),
-    "int"=unlist(int)
-  )
-  
-  return(df)
-}
+
 
 
 
@@ -94,10 +39,5 @@ b <- a %>%
     target %in% swiss_prot$Entry
     )
   
-
-b <- a %>% 
-  filter(int == "gene") %>% 
-  filter(source == "IRAK1") %>%
-  filter(target %in% swiss_prot$Entry)
 
 
