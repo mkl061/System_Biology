@@ -5,6 +5,8 @@ if (!require("BiocManager", quietly = T)) {
   install.packages("BiocManager", quiet = T)
 }
 BiocManager::install(update = T, ask = F, ... = c(quiet = T))
+# OBS! The command above usually give a warning, but apparantly this
+# can be ignored. See: https://support.bioconductor.org/p/128825/ 
 
 
 # # Biomartr:
@@ -16,11 +18,15 @@ BiocManager::install(update = T, ask = F, ... = c(quiet = T))
 # }
 
 if (!require("biomaRt", quietly = T)) {
-  install.packages("biomaRt", quiet = T)
+  #install.packages("biomaRt", quiet = T)
+  BiocManager::install("biomaRt")
 }
 
+
 # Human data base:
-BiocManager::install("org.Hs.eg.db", force = T)
+if (!require("org.Hs.eg.db", quietly = T)) {
+  BiocManager::install("org.Hs.eg.db", ask = F, update = T)#, force = T)
+}
 
 
 # Tidyverse:
@@ -41,7 +47,7 @@ if (Sys.info()[1] == "Linux") {
 # Splits apart a string at "|", removes duplicates, and splice it together again:
 str_rm_duplicates <- function(string) {
   string <- string %>% 
-    str_split(pattern = "\\|") %>% # Splitts the string at "|", into list
+    str_split(pattern = "\\|") %>% # Splits the string at "|", into list
     unlist() %>% # Unlist to convert to vector
     base::unique() %>%  # Keep only the unique elements (i.e. removes duplicates)
     paste0(collapse = "|") # Collapse all elements (seperated by "|") into single string 
@@ -67,7 +73,30 @@ str_rev_in_vec <- function(vec) {
   return(vec)
 }
 
-
+# Testing function:
+foo <- function(df, row, col1, col2, from_sep, to_sep) {
+  first <- df[row, col1] 
+  
+  second <- df[row, col2] 
+  
+  if (first == "" && second != "") {
+    final <- second
+  } else if (first != "" && second == "") {
+    final <- first
+  } else {
+    final <- str_flatten(c(first, second), collapse = from_sep)
+    if (from_sep == "|") {
+      final <- final %>% str_split(pattern = "\\|")
+    } else {
+      final <- final %>% str_split(pattern = from_sep)
+    }
+    final <- final %>%
+      base::unlist() %>%
+      base::unique() %>%
+      str_flatten(collapse = to_sep)
+  }
+  return(final)
+}
 
 ### Input data ----
 # Read files:
@@ -84,7 +113,7 @@ for (col in 1:ncol(input_data)) {
   }
 }
 
-
+rm(col) # Remove the stored variable (generated in for-loop)
 
 ### IDs with biomaRt ----
 # listEnsembl()
@@ -103,32 +132,78 @@ ensembl.con <- useMart("ensembl", dataset = "hsapiens_gene_ensembl")
 multiple_ids <- getBM(attributes = c(
   "uniprotswissprot", # Uniprot ID, from the Swiss-Prot data base
   "entrezgene_id", # I.e. NCBI gene ID
-  "external_gene_name", 
-  "external_synonym",
-  "hgnc_id"), # HGCN ID
+  "external_gene_name", # I.e. Gene symbol 
+  "hgnc_id"), # I.e. HGCN ID
       filters = "uniprotswissprot",
       values = input_data$UniprotKB,
-      mart = ensembl.con) #%>% 
-  #add_column("dupl"=duplicated(.[,1])) %>% 
-  #filter(dupl != T) #%>% View()
+      mart = ensembl.con)
 
+# Creates a data frame with all the synonyms:
+# Each synonym has its own row, meaning that there are multiple rows
+# with the same id/value in the "uniprotswissprot" column.
+raw_gene_syn_df <- getBM(attributes = c(
+  "uniprotswissprot", # Uniprot ID, from the Swiss-Prot data base
+  "external_synonym"), # I.e. gene synonyms
+  filters = "uniprotswissprot",
+  values = input_data$UniprotKB,
+  mart = ensembl.con)
 
-# Create a new df with removal of duplicates:
-new_df <- input_data %>% dplyr::select(UniprotKB)
-new_df$new <- NA
-for (row in new_df$UniprotKB) {
-  vec <- multiple_ids %>% 
-    filter(uniprotswissprot == row) %>%
-    dplyr::select(external_synonym) %>% 
-    pull() %>% 
-    paste0(collapse = "|")
+# Takes the raw_gene_syn_df, and combine all the synonym for every Uniprot ID
+# to a single row:
+# "fin_gene_syn_df stands for "finished gene synonym data frame"
+fin_gene_syn_df <- input_data %>% 
+  dplyr::select(UniprotKB) # Uniprot IDs from input data
+
+fin_gene_syn_df$gene_synonyms_BioMart <- NA # Create a new column
+
+for (U_ID in fin_gene_syn_df$UniprotKB) { # Iterate trough all Uniprot IDs
+  vec <- raw_gene_syn_df %>% # Get raw data
+    filter(uniprotswissprot == U_ID) %>% # Filter to only rows with current Uniprot ID
+    dplyr::select(external_synonym) %>% # Select only synonym column
+    pull() %>% # Converts data frame column to character vector 
+    paste0(collapse = "|") # Collapse all elements of vector to single string
   
-  new_df$new[new_df$UniprotKB == row] <- vec
+  # Assigns the string as the cell-content of the column (i.e. gene synonym)
+  # and the row (i.e. the one with column UniprotKB == the Uniprot ID):
+  fin_gene_syn_df$gene_synonyms_BioMart[fin_gene_syn_df$UniprotKB == U_ID] <- vec
 }
-new_df <- new_df %>% 
-  filter(UniprotKB != "") # Remove rows with empty cells
 
-a <- left_join(input_data, new_df, by=c("UniprotKB" = "UniprotKB"))
+# Remove rows with empty Uniprot ID:
+fin_gene_syn_df <- fin_gene_syn_df %>% 
+  filter(UniprotKB != "") 
+
+# Combine the data frame with different IDs with the the data frame
+# with all the gene synonyms:
+BioMart_df <- left_join(
+  multiple_ids, fin_gene_syn_df, 
+  by=c("uniprotswissprot" = "UniprotKB"))
+
+
+## Tidying up:
+rm(multiple_ids, 
+   raw_gene_syn_df, 
+   fin_gene_syn_df,
+   U_ID,
+   vec
+   )
+
+###############
+# # Create a new df with removal of duplicates:
+# gene_syn_df <- input_data %>% dplyr::select(UniprotKB)
+# gene_syn_df$new <- NA
+# for (row in gene_syn_df$UniprotKB) {
+#   vec <- multiple_ids %>%
+#     filter(uniprotswissprot == row) %>%
+#     dplyr::select(external_synonym) %>%
+#     pull() %>%
+#     paste0(collapse = "|")
+# 
+#   gene_syn_df$new[gene_syn_df$UniprotKB == row] <- vec
+# }
+# gene_syn_df <- gene_syn_df %>%
+#   filter(UniprotKB != "") # Remove rows with empty cells
+###################
+
 
 
 ### Find protein name and synonyms from Swiss-Prot db ----
@@ -146,16 +221,17 @@ if ("Swiss_Prot.tsv" %in% dir()) {
 
 
 # All the Uniprot IDs from the spreadsheet:
-Uni_ids <- input_data %>% 
+Uniprot_IDs <- input_data %>% 
   dplyr::select(UniprotKB) %>% 
   pull() # Results in character vector
 
 # Subset of swiss_prot df:
-sub_df <- swiss_prot %>% .[.$Entry %in% Uni_ids, ]
+sub_df <- swiss_prot %>% .[.$Entry %in% Uniprot_IDs, ] # Only data for our proteins
 
 # Create new columns:
 sub_df$protein_name <- NA
-sub_df$synonyms <- NA
+sub_df$protein_synonyms_swiss <- NA
+sub_df$gene_synonyms_swiss <- NA
 
 # Filling the new columns with protein name and synonyms:
 for (row in 1:nrow(sub_df)) { # Iterate through all the rows
@@ -184,18 +260,21 @@ for (row in 1:nrow(sub_df)) { # Iterate through all the rows
   
   # Remove possible EC-number from the synonyms: 
   if (!is.na(syn[1])) {
-    flag <- numeric(0)
-    for (i in 1:length(syn)) {
-      if (str_starts(syn[i], "EC")) {
-        flag <- base::append(flag, i)
+    flag <- numeric(0) # Vector to hold index values
+    for (i in 1:length(syn)) { # Iterate over all elements of "syn" vector
+      if (str_starts(syn[i], "EC")) { # If element starts with "EC"
+        flag <- base::append(flag, i) # Append index value for the element, to flag 
       }
     }
     
-    
+    # Checks if any elements of "syn" started with "EC" (i.e. is length of flag > 0)
     if (length(flag > 0)) {
-      syn <- syn[-c(flag)]
+      syn <- syn[-c(flag)] # Removes the element with index values in flag
     }
   }
+  
+  # Remove possible NAs that have been included:
+  syn <- syn[!is.na(syn)]
   
   # Collapse the synonyms with the "|" between:
   syn <- paste0(syn, collapse = "|")
@@ -205,12 +284,96 @@ for (row in 1:nrow(sub_df)) { # Iterate through all the rows
     str_replace(pattern = "_HUMAN", replacement = "")
   
   # Add the entry name to the other synonyms:
-  syn <- str_c(ent_name, syn, sep = "|")
+  # There may not be any synonyms in the data base, and then we only
+  # ad the entry name:
+  if (syn != "") {
+    syn <- str_c(ent_name, syn, sep = "|")
+  } else {
+    syn <- ent_name
+  }
   
-  # Add the protein name and the synonyms to their columns:
+  
+  g_syn <- foo(df = sub_df,
+              row = row,
+              col1 = "Gene.Names", 
+              col2 = "Gene.Names..synonym.",
+              from_sep = " ", 
+              to_sep = "|")
+  # # Gene synonyms:
+  # g_name <- sub_df[row,] %>% 
+  #   dplyr::select(Gene.Names) %>%
+  #   pull()
+  # 
+  # g_synonyms <- sub_df[row,] %>% 
+  #   dplyr::select(Gene.Names..synonym.) %>%
+  #   pull()
+  # 
+  # if (g_synonyms != "") {
+  #   g_syn <- str_flatten(c(g_name, g_synonyms), collapse = " ") %>% 
+  #     str_split(pattern = " ") %>% 
+  #     base::unlist() %>% 
+  #     base::unique() %>% 
+  #     str_flatten(collapse = "|")
+  # } else {
+  #   g_syn <- g_name
+  # }
+  
+  
+  # Assign the values to the respective columns
   sub_df[row, "protein_name"] <- p_name
-  sub_df[row, "synonyms"] <- syn
+  sub_df[row, "protein_synonyms_swiss"] <- syn
+  sub_df[row, "gene_synonyms_swiss"] <- g_syn
+  
 }
+
+
+Swiss_df <- sub_df %>% 
+  dplyr::select(Entry, 
+                protein_name, 
+                protein_synonyms_swiss,
+                gene_synonyms_swiss)
+
+
+## Tidy up:
+rm(
+  sub_df,
+  string, 
+  p_name, 
+  syn, 
+  ent_name, 
+  g_syn,
+  i,
+  flag,
+  row
+)
+
+
+hei <- left_join(input_data, BioMart_df, by=c("UniprotKB" = "uniprotswissprot"))
+hei2 <- left_join(hei, Swiss_df, by=c("UniprotKB" = "Entry"))
+
+hei2$final_gene_syn <- NA
+for (i in 1:nrow(hei2)) {
+  if (hei2[i, "UniprotKB"] != "") {
+    hei2[i, "final_gene_syn"] <- foo(
+      df = hei2,
+      row = i,
+      col1 = "gene_synonyms_BioMart",
+      col2 = "gene_synonyms_swiss",
+      from_sep = "|",
+      to_sep = "|"
+    )
+  }
+}
+
+hei3 <- hei2 %>% 
+  dplyr::select(
+    id,
+    Common_name,
+    protein_name,
+    UniprotKB,
+    protein_synonyms_swiss,
+    final_gene_syn
+  )
 
 
 
