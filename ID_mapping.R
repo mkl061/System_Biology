@@ -41,13 +41,21 @@ if (Sys.info()[1] == "Linux") {
 # Splits apart a string at "|", removes duplicates, and splice it together again:
 str_rm_duplicates <- function(string) {
   string <- string %>% 
-    str_split(pattern = "\\|") %>%
-    unlist() %>% 
-    base::unique() %>% 
-    paste0(collapse = "|")
+    str_split(pattern = "\\|") %>% # Splitts the string at "|", into list
+    unlist() %>% # Unlist to convert to vector
+    base::unique() %>%  # Keep only the unique elements (i.e. removes duplicates)
+    paste0(collapse = "|") # Collapse all elements (seperated by "|") into single string 
   return(string)
 }
 
+str_rm_NA <- function(string) {
+  string <- string %>% 
+    str_split(pattern = "\\|") %>%
+    unlist() %>% 
+    .[. != "NA"] %>% 
+    paste0(collapse = "|")
+  return(string)
+}
 
 # Function to reverse all elements in a character column:
 str_rev_in_vec <- function(vec) {
@@ -64,6 +72,8 @@ str_rev_in_vec <- function(vec) {
 ### Input data ----
 # Read files:
 input_data <- read.csv("nodes.csv")
+
+input_data$Common_name <- input_data$Common_name %>% str_replace("\xa0", "") # Fixing a reocurring problem
 
 # Tidy up the file by removing unwanted white spaces:
 for (col in 1:ncol(input_data)) {
@@ -115,6 +125,8 @@ for (row in new_df$UniprotKB) {
   
   new_df$new[new_df$UniprotKB == row] <- vec
 }
+new_df <- new_df %>% 
+  filter(UniprotKB != "") # Remove rows with empty cells
 
 a <- left_join(input_data, new_df, by=c("UniprotKB" = "UniprotKB"))
 
@@ -146,7 +158,7 @@ sub_df$protein_name <- NA
 sub_df$synonyms <- NA
 
 # Filling the new columns with protein name and synonyms:
-for (row in 1:nrow(sub_df)) { # Iterate throught all the rows
+for (row in 1:nrow(sub_df)) { # Iterate through all the rows
   # Find the cell containing the preferred protein name, and synonyms:
   string <- sub_df[row,] %>% 
     dplyr::select(Protein.names) %>% # Focus on only the Protein.names column
