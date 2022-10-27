@@ -9,24 +9,12 @@ BiocManager::install(update = T, ask = F, ... = c(quiet = T))
 # can be ignored. See: https://support.bioconductor.org/p/128825/ 
 
 
-# # Biomartr:
-# if (!require("biomartr", quietly = T)) {
-#   BiocManager::install("Biostrings", update = T, ask = F, force = T)
-#   BiocManager::install("biomaRt", update = T, ask = F)
-#   
-#   install.packages("biomartr", dependencies = T, quiet = T)
-# }
 
 if (!require("biomaRt", quietly = T)) {
   #install.packages("biomaRt", quiet = T)
   BiocManager::install("biomaRt")
 }
 
-
-# Human data base:
-if (!require("org.Hs.eg.db", quietly = T)) {
-  BiocManager::install("org.Hs.eg.db", ask = F, update = T)#, force = T)
-}
 
 
 # Tidyverse:
@@ -44,24 +32,24 @@ if (Sys.info()[1] == "Linux") {
 
 
 ### Custom function ----
-# Splits apart a string at "|", removes duplicates, and splice it together again:
-str_rm_duplicates <- function(string) {
-  string <- string %>% 
-    str_split(pattern = "\\|") %>% # Splits the string at "|", into list
-    unlist() %>% # Unlist to convert to vector
-    base::unique() %>%  # Keep only the unique elements (i.e. removes duplicates)
-    paste0(collapse = "|") # Collapse all elements (seperated by "|") into single string 
-  return(string)
-}
-
-str_rm_NA <- function(string) {
-  string <- string %>% 
-    str_split(pattern = "\\|") %>%
-    unlist() %>% 
-    .[. != "NA"] %>% 
-    paste0(collapse = "|")
-  return(string)
-}
+# # Splits apart a string at "|", removes duplicates, and splice it together again:
+# str_rm_duplicates <- function(string) {
+#   string <- string %>% 
+#     str_split(pattern = "\\|") %>% # Splits the string at "|", into list
+#     unlist() %>% # Unlist to convert to vector
+#     base::unique() %>%  # Keep only the unique elements (i.e. removes duplicates)
+#     paste0(collapse = "|") # Collapse all elements (seperated by "|") into single string 
+#   return(string)
+# }
+# 
+# str_rm_NA <- function(string) {
+#   string <- string %>% 
+#     str_split(pattern = "\\|") %>%
+#     unlist() %>% 
+#     .[. != "NA"] %>% 
+#     paste0(collapse = "|")
+#   return(string)
+# }
 
 # Function to reverse all elements in a character column:
 str_rev_in_vec <- function(vec) {
@@ -74,46 +62,139 @@ str_rev_in_vec <- function(vec) {
 }
 
 # Testing function:
-foo <- function(df, row, col1, col2, from_sep, to_sep) {
+col_splice_to_string <- function(df, row, col1, col2, from_sep, to_sep) {
   first <- df[row, col1] 
-  
   second <- df[row, col2] 
   
-  if (first == "" && second != "") {
-    final <- second
-  } else if (first != "" && second == "") {
-    final <- first
-  } else {
-    final <- str_flatten(c(first, second), collapse = from_sep)
-    if (from_sep == "|") {
-      final <- final %>% str_split(pattern = "\\|")
-    } else {
-      final <- final %>% str_split(pattern = from_sep)
+  first_NA <- is.na(first)
+  second_NA <- is.na(second)
+  
+  if (first_NA == F && second_NA == F) { # None are NA
+    # None of the variables are equal to NA.
+    # However, they may be equal to "" (i.e. they may be empty strings)
+    
+    # Create variables, holding either TRUE or FALSE, depending on
+    # if the input variables are equal to "" or not:
+    first_empty <- first == ""
+    second_empty <- second == ""
+    
+    if (first_empty == F && second_empty == F) { # None are empty (i.e. "")
+      # None of them are empty, then we can proceed to combining them:
+      final <- str_flatten(c(first, second), collapse = from_sep)
+      # Check if "|" is used as separator. If so, given that "|" is
+      # a special character, we need to putt "\\" in front:
+      if (from_sep == "|") {
+        final <- final %>% str_split(pattern = "\\|") # splits (at "|") into list of vectors
+      } else { # The separator is something else:
+        final <- final %>% str_split(pattern = from_sep) # splits (at from_sep) into list of vectors
+      }
+      final <- final %>%
+        base::unlist() %>% # Unlist to get the single vector
+        base::unique() %>% # Keep only the unique elements of the vector
+        str_flatten(collapse = to_sep) # Flattens the vector to a single string, with each element separated by the to_sep
+      
+      return(final) # Return the string
+    } else if (first_empty == T && second_empty == T) {
+      return(NA)
+    } else if (first_empty == T) { # First is empty, but not Second
+      return(second)
+    } else { # Second is empty, but first is not
+      return(first)
     }
-    final <- final %>%
-      base::unlist() %>%
-      base::unique() %>%
-      str_flatten(collapse = to_sep)
+    
+    
+  } else if (first_NA == T && second_NA == T) { # Both are NA
+    return(NA)
+  } else if (first_NA == T) { # First is NA, Second is not
+    if (second == "") { # Checks if Second could be empty
+      return(NA) # If so, return NA
+    } else { 
+      # Second is neither NA nor "", but we need to check if it 
+      # consists of multiple terms or not:
+      if (str_detect(str_squish(second), from_sep) == F) { # Is from_sep in Second
+        return(second)
+      } else { # from_sep is in Second
+        # Check if "|" is used as separator. If so, given that "|" is
+        # a special character, we need to putt "\\" in front:
+        if (from_sep == "|") {
+          second <- second %>% str_split(pattern = "\\|") # splits (at "|") into list of vectors
+        } else { # The separator is something else:
+          second <- second %>% str_split(pattern = from_sep) # splits (at from_sep) into list of vectors
+        }
+        second <- second %>%
+          base::unlist() %>% # Unlist to get the single vector
+          base::unique() %>% # Keep only the unique elements of the vector
+          str_flatten(collapse = to_sep) # Flattens the vector to a single string, with each element separated by the to_sep
+        
+        return(second) # Return the string
+      }
+    }
+  } else { # Second is NA, First is not
+    if (first == "") { # Checks if first could be empty
+      return(NA) # If so, return NA
+    } else { 
+      # first is neither NA nor "", but we need to check if it 
+      # consists of multiple terms or not:
+      if (str_detect(str_squish(first), from_sep) == F) { # Is from_sep in first
+        return(first)
+      } else { # from_sep is in first
+        # Check if "|" is used as separator. If so, given that "|" is
+        # a special character, we need to putt "\\" in front:
+        if (from_sep == "|") {
+          first <- first %>% str_split(pattern = "\\|") # splits (at "|") into list of vectors
+        } else { # The separator is something else:
+          first <- first %>% str_split(pattern = from_sep) # splits (at from_sep) into list of vectors
+        }
+        first <- first %>%
+          base::unlist() %>% # Unlist to get the single vector
+          base::unique() %>% # Keep only the unique elements of the vector
+          str_flatten(collapse = to_sep) # Flattens the vector to a single string, with each element separated by the to_sep
+        
+        return(first) # Return the string
+      }
+    }
   }
-  return(final)
 }
+
+
 
 ### Input data ----
-# Read files:
-input_data <- read.csv("nodes.csv")
+## Nodes:
 
-input_data$Common_name <- input_data$Common_name %>% str_replace("\xa0", "") # Fixing a reocurring problem
+# Read files:
+input_data_nodes <- read.csv("nodes.csv")
+
+input_data_nodes$Common_name <- input_data_nodes$Common_name %>% str_replace("\xa0", "") # Fixing a reocurring problem
 
 # Tidy up the file by removing unwanted white spaces:
-for (col in 1:ncol(input_data)) {
-  if (is.character(input_data[,col])) { # Checks if column is of character type
-    input_data[,col] <- sapply(input_data[,col], 
-                                   str_squish) # Removes white spaces in front, back and reduce multiple spaces to a single one
-    #input_data[,col] <- sapply(input_data[,col], str_trim)
+remove_whitespaces <- function(df) {
+  for (col in 1:ncol(df)) {
+    if (is.character(df[,col])) { # Checks if column is of character type
+      df[,col] <- sapply(
+        df[,col],
+        str_squish) # Removes white spaces in front, back and reduce multiple spaces to a single one
+    }
   }
+  return(df)
 }
 
-rm(col) # Remove the stored variable (generated in for-loop)
+input_data_nodes <- remove_whitespaces(input_data_nodes)
+
+# for (col in 1:ncol(input_data_nodes)) {
+#   if (is.character(input_data_nodes[,col])) { # Checks if column is of character type
+#     input_data_nodes[,col] <- sapply(input_data_nodes[,col], 
+#                                    str_squish) # Removes white spaces in front, back and reduce multiple spaces to a single one
+#   }
+# }
+
+#rm(col) # Remove the stored variable (generated in for-loop)
+
+
+## Edges:
+input_data_edges <- read.csv("edges.csv")
+
+input_data_edges <- remove_whitespaces(input_data_edges)
+
 
 ### IDs with biomaRt ----
 # listEnsembl()
@@ -135,7 +216,7 @@ multiple_ids <- getBM(attributes = c(
   "external_gene_name", # I.e. Gene symbol 
   "hgnc_id"), # I.e. HGCN ID
       filters = "uniprotswissprot",
-      values = input_data$UniprotKB,
+      values = input_data_nodes$UniprotKB,
       mart = ensembl.con)
 
 # Creates a data frame with all the synonyms:
@@ -145,13 +226,13 @@ raw_gene_syn_df <- getBM(attributes = c(
   "uniprotswissprot", # Uniprot ID, from the Swiss-Prot data base
   "external_synonym"), # I.e. gene synonyms
   filters = "uniprotswissprot",
-  values = input_data$UniprotKB,
+  values = input_data_nodes$UniprotKB,
   mart = ensembl.con)
 
 # Takes the raw_gene_syn_df, and combine all the synonym for every Uniprot ID
 # to a single row:
 # "fin_gene_syn_df stands for "finished gene synonym data frame"
-fin_gene_syn_df <- input_data %>% 
+fin_gene_syn_df <- input_data_nodes %>% 
   dplyr::select(UniprotKB) # Uniprot IDs from input data
 
 fin_gene_syn_df$gene_synonyms_BioMart <- NA # Create a new column
@@ -187,23 +268,6 @@ rm(multiple_ids,
    vec
    )
 
-###############
-# # Create a new df with removal of duplicates:
-# gene_syn_df <- input_data %>% dplyr::select(UniprotKB)
-# gene_syn_df$new <- NA
-# for (row in gene_syn_df$UniprotKB) {
-#   vec <- multiple_ids %>%
-#     filter(uniprotswissprot == row) %>%
-#     dplyr::select(external_synonym) %>%
-#     pull() %>%
-#     paste0(collapse = "|")
-# 
-#   gene_syn_df$new[gene_syn_df$UniprotKB == row] <- vec
-# }
-# gene_syn_df <- gene_syn_df %>%
-#   filter(UniprotKB != "") # Remove rows with empty cells
-###################
-
 
 
 ### Find protein name and synonyms from Swiss-Prot db ----
@@ -211,7 +275,7 @@ rm(multiple_ids,
 # https://rest.uniprot.org/uniprotkb/stream?fields=accession%2Cid%2Cprotein_name%2Cgene_names%2Cgene_synonym&format=tsv&query=%28%2A%29%20AND%20%28reviewed%3Atrue%29%20AND%20%28model_organism%3A9606%29
 
 # Checks if "Swiss_Prot.tsv" is in the working directory,
-# if not it downloads it from the Uniprots webpage:
+# if not it downloads it from the Uniprot's webpage:
 if ("Swiss_Prot.tsv" %in% dir()) {
   swiss_prot <- read.delim("Swiss_Prot.tsv")  
 } else {
@@ -221,7 +285,7 @@ if ("Swiss_Prot.tsv" %in% dir()) {
 
 
 # All the Uniprot IDs from the spreadsheet:
-Uniprot_IDs <- input_data %>% 
+Uniprot_IDs <- input_data_nodes %>% 
   dplyr::select(UniprotKB) %>% 
   pull() # Results in character vector
 
@@ -249,7 +313,7 @@ for (row in 1:nrow(sub_df)) { # Iterate through all the rows
   
   # Take the string not containing the preferred protein name,
   # cut it up into the synonyms, which are covered with "( )",
-  # remove the parentheses, and return a characther vector:
+  # remove the parentheses, and return a character vector:
   syn <- string %>% 
     str_sub(
       str_locate(., pattern = "\\(")[1]+1, # starts after the first "("
@@ -292,31 +356,14 @@ for (row in 1:nrow(sub_df)) { # Iterate through all the rows
     syn <- ent_name
   }
   
-  
-  g_syn <- foo(df = sub_df,
+  # Use the custom function to collapse the gene name and all its synonyms
+  # together in a single string:
+  g_syn <- col_splice_to_string(df = sub_df,
               row = row,
               col1 = "Gene.Names", 
               col2 = "Gene.Names..synonym.",
               from_sep = " ", 
               to_sep = "|")
-  # # Gene synonyms:
-  # g_name <- sub_df[row,] %>% 
-  #   dplyr::select(Gene.Names) %>%
-  #   pull()
-  # 
-  # g_synonyms <- sub_df[row,] %>% 
-  #   dplyr::select(Gene.Names..synonym.) %>%
-  #   pull()
-  # 
-  # if (g_synonyms != "") {
-  #   g_syn <- str_flatten(c(g_name, g_synonyms), collapse = " ") %>% 
-  #     str_split(pattern = " ") %>% 
-  #     base::unlist() %>% 
-  #     base::unique() %>% 
-  #     str_flatten(collapse = "|")
-  # } else {
-  #   g_syn <- g_name
-  # }
   
   
   # Assign the values to the respective columns
@@ -347,15 +394,21 @@ rm(
   row
 )
 
+## Double merge, the BioMart_df and Swiss_df, to the input_data_nodes df:
+merge_df <- input_data_nodes %>% 
+  left_join(., BioMart_df,
+            by=c("UniprotKB" = "uniprotswissprot")) %>% 
+  left_join(., Swiss_df,
+            by=c("UniprotKB" = "Entry"))
 
-hei <- left_join(input_data, BioMart_df, by=c("UniprotKB" = "uniprotswissprot"))
-hei2 <- left_join(hei, Swiss_df, by=c("UniprotKB" = "Entry"))
 
-hei2$final_gene_syn <- NA
-for (i in 1:nrow(hei2)) {
-  if (hei2[i, "UniprotKB"] != "") {
-    hei2[i, "final_gene_syn"] <- foo(
-      df = hei2,
+# Create a new column for the final version of gene synonyms,
+# and fill it with the function col_splice_to_string():
+merge_df$final_gene_syn <- NA
+for (i in 1:nrow(merge_df)) {
+  if (merge_df[i, "UniprotKB"] != "") {
+    merge_df[i, "final_gene_syn"] <- col_splice_to_string(
+      df = merge_df,
       row = i,
       col1 = "gene_synonyms_BioMart",
       col2 = "gene_synonyms_swiss",
@@ -365,17 +418,26 @@ for (i in 1:nrow(hei2)) {
   }
 }
 
-hei3 <- hei2 %>% 
+
+
+finished_df <- merge_df %>% 
+  mutate(final_name = ifelse(
+    Common_name == "", 
+    protein_name, 
+    Common_name)) %>% 
   dplyr::select(
     id,
     Common_name,
-    protein_name,
     UniprotKB,
-    protein_synonyms_swiss,
-    final_gene_syn
+    "protein_synonyms" = protein_synonyms_swiss,
+    "gene_synonyms" = final_gene_syn,
+    molecule_type
   )
 
 
+
+## Tidy up:
+rm(merge_df)
 
 ### Result from BioGateway query ----
 ## Reads a BioGateway network's edge table. 
@@ -439,191 +501,61 @@ read_BioGateway <- function(df) {
 }
 
 
-BG_TFs_NFKB1_and_RELA <- read.csv("Marius_edges_test.csv")
 
-res <- read_BioGateway(BG_TFs_NFKB1_and_RELA) %>% 
-  filter(int != "prot2bp") # Don't need the GO-term information
-
-genes <- res %>% 
-  filter(int == "gene") %>% 
-  filter(target %in% swiss_prot$Entry)
-
-
-a <- left_join(genes, input_data[, c("UniprotKB", "id")], 
-               by=c("target" = "UniprotKB"))
-
-
-### Other ----
-
-## Your spreadsheet:
-#dat <- read.csv("original_set.csv")
-dat <- read.csv("nodes.csv")
-dat$Common_name <- dat$Common_name %>% str_replace("\xa0", "") # Fixing a recurring problem
-
-## Trim all whitespaces in all cells with strings:
-for (col in 1:ncol(dat)) {
-  if (is.character(dat[,col])) {
-    dat[,col] <- sapply(dat[,col], str_trim)
-  }
+## Takes the information from the BioGateway file and adds genes that are
+## not currently in the network:
+add_genes_BioGateway <- function(file, updated_df) {
+  input_df <- read.csv(file) %>% 
+    filter(Source.Graph != "prot2bp") # Remove the GO-term information
+  
+  interpreted_input <- read_BioGateway(input_df)
+  
+  ### STOPED HERE!
+  TF_df <- interpreted_input %>% 
+    filter(int == "tfac2gene")
+  #return(TF_df)
+  
+  genes <- interpreted_input %>% 
+    filter(int == "gene") %>% # Only the genes
+    filter(target %in% swiss_prot$Entry) %>% # Removes those duplicates (i.e. multiple IDs for a single protein)
+    mutate(in_network = ifelse(target %in% updated_df$UniprotKB, T, F)) %>% # Create a new column with T or F depending on protein in network
+    filter(in_network == T) %>% # Only keep those with proteins in network
+    select(-in_network) # Remove the column created earlier
+  
+  sub_df_from_updated_df <- updated_df %>% 
+    filter(UniprotKB %in% genes$target) %>%
+    filter(molecule_type != "gene") %>% # 
+    mutate(molecule_type = "gene",
+           id = str_c(id, "_gene"))
+  
+  return_df <- bind_rows(updated_df, sub_df_from_updated_df) %>% 
+    distinct(.keep_all = T)
+  
+  return(return_df)
 }
 
 
+newest_df <- finished_df %>% 
+  add_genes_BioGateway("positive regulation of JNK cascade.csv", .) %>% 
+  add_genes_BioGateway("interleukin-1-mediated signaling pathway.csv", .)
 
 
+## Adding all edges for genes encoding proteins:
+genes <- newest_df %>% 
+  filter(molecule_type == "gene") %>% 
+  select(UniprotKB) %>% 
+  pull() 
 
-ID_mapping <- function(from, to, df, keys_column, from_column) {
-  ## Uniprot IDs given when mapping by "gene symbol":
-  ids_from_db <- mapIds(org.Hs.eg.db,
-                      #keys = df$id,
-                      keys = unlist(df[keys_column]),
-                      column = to,
-                      keytype = from,
-                      multiVals = "list") # A gene symbol may refer to multiple IDs (return a vector of these)
-  
-  
-  # We usually start by finding Uniprot IDs!
-  if (to == "UNIPROT") {
-    # Checks if the Swiss_Prot.tsv file is in the directory.
-    # If not, gets it from the web via API URL:
-    if ("Swiss_Prot.tsv" %in% dir()) {
-      swiss_prot <- read.delim("Swiss_Prot.tsv")  
-    } else {
-      cat("OBS! The Swiss_Prot file is not in working directory. Fetching it from web, but it takes a while")
-      swiss_prot <- read.delim("https://rest.uniprot.org/uniprotkb/stream?fields=accession%2Cid%2Cprotein_name%2Cgene_names&format=tsv&query=%28reviewed%3Atrue%29%20AND%20%28model_organism%3A9606%29")
-    }
-    
-    
-    for (lst_ind in 1:length(ids_from_db)) { # List index val
-      new_vec <- vector() # Empty vector
-      for (vec_elm in ids_from_db[[lst_ind]]) { # Elements of the list-element
-        if (vec_elm %in% swiss_prot$Entry == T) { # Checks if element (i.e. Uniprot ID) is in Swiss-Prot (i.e. is it reviewed by expert)
-          new_vec <- append(new_vec, vec_elm) # Adds the element to the vector
-        }
-      }
-      
-      if (length(new_vec) == 0) { # If the vector is empty, set NA
-        new_vec <- NA
-      }
-      
-      ids_from_db[[lst_ind]] <- new_vec
-      
-    }
-  }
-  
-  ##############################################################################
-  # OBS! It is missing some lines of code HERE!
-  # Because the next line of code only works if all the list elements only
-  # containt 1 element each! Which it seems to do for Swiss-Prot
-  ##############################################################################
-  
-  
-  ## Unlist the list:
-  ids_from_db <- unlist(ids_from_db)
-  
-  
-  tabl_check <- df %>% 
-    dplyr::select("id"=!!sym(keys_column), "Our_ID"=!!sym(from_column)) %>% 
-    add_column("Mapping_ID" = ids_from_db) %>% 
-    mutate(final = ifelse(Our_ID == "", # Is Our_ID an empty string?
-                          Mapping_ID, # Yes; Set as the ID gotten from ID mapping
-                          ifelse(is.na(Our_ID),  # No; Initiate another ifelse(). Is Our_ID a NA?
-                                 Mapping_ID,  # Yes; Set as the ID gotten from ID mapping
-                                 Our_ID # No; keep Our_ID as it was
-                                 ) 
-                          )
-          )
-  
-  df[from_column] <- tabl_check$final
-  
-  return(df)
-}
+df <- newest_df %>%
+  filter(UniprotKB %in% genes) %>% 
+  select(id, UniprotKB, molecule_type) %>%
+  mutate(molecule_type = ifelse(molecule_type == "gene", "source", "target")) %>%
+  group_by(molecule_type) %>% pivot_wider(names_from =  molecule_type, values_from = id) %>% 
+  mutate(interaction = "encodes",
+         Added.from = "BioGateway",
+         Curator = "Marius") %>% 
+  select(-UniprotKB) %>% 
+  relocate(source, target)
 
-
-View(ID_mapping("SYMBOL", "UNIPROT", dat, keys_column = "id", from_column = "UniprotKB"))
-ny <- ID_mapping("SYMBOL", "UNIPROT", dat, keys_column = "id", from_column = "UniprotKB")
-liste <- ID_mapping("UNIPROT", "ENSEMBL", ny, keys_column = "UniprotKB", from_column = "Ensembl")
-View(ID_mapping("UNIPROT", "SYMBOL", dat, keys_column = "UniprotKB", from_column = "Ensembl"))
-
-
-
-## Uniprot IDs given when mapping by "gene symbol":
-ids_from_db <- mapIds(org.Hs.eg.db,
-              keys = dat$id,
-              column = "UNIPROT",
-              keytype = "SYMBOL",
-              multiVals = "list") # A gene symbol may refer to multiple IDs (return a vector of these)
-
-
-## Given that ids_from_db is a list, we need to find a single identifier for
-## each protein before we can turn the list into a vector:
-uni_sec <- ids_from_db
-
-
-for (lst_ind in 1:length(uni_sec)) {
-  new_vec <- vector()
-  for (vec_elm in uni_sec[[lst_ind]]) {
-    if (vec_elm %in% swiss_prot$Entry == T) {
-      new_vec <- append(new_vec, vec_elm)
-    }
-  }
-  
-  if (length(new_vec) == 0) {
-    new_vec <- NA
-  }
-  
-  uni_sec[[lst_ind]] <- new_vec
-  
-  df <- df %>% 
-    mutate(UniprotKB = ifelse(
-      tabl_check$Our_ID == "" && (tabl_check$Mapping_ID != "" || is.na(tabl_check$Mapping_ID)),
-      tabl_check$final <- tabl_check$Mapping_ID,
-      tabl_check$final <- tabl_check$Our_ID
-    ))
-  
-  return(df)
-}
-
-## Unlist the list:
-uni_sec <- unlist(uni_sec)
-
-# if (all(lengths(uni_sec))) {
-#   uni_sec <- unlist(uni_sec)
-# } else {
-#   cat("OBS! Some proteins have multiple identifiers in Swiss-Prot")
-#   view(
-#     uni_sec[which(lengths(uni_sec) != 1)]  
-#   )
-# }
-
-#dat.copy <- dat
-#dat$UniprotKB[1:5] <- ""
-
-
-tabl_check <- cbind.data.frame(dat$id,
-                               dat$UniprotKB,
-                               uni_sec)
-base::colnames(tabl_check) <- c("id", "Our_ID", "Mapping_ID")
-tabl_check$identical <- tabl_check$Our_ID == tabl_check$Mapping_ID
-
-# OBS!!! These are the non-identical ones:
-tabl_check %>% filter(identical == F)
-
-tabl_check$final <- NA
-for (i in 1:nrow(tabl_check)) {
-  if (tabl_check$Our_ID[i] == "" && (tabl_check$Mapping_ID[i] != "" || is.na(tabl_check$Mapping_ID[i]))) {
-    tabl_check$final[i] <- tabl_check$Mapping_ID[i]
-  } else {
-    tabl_check$final[i] <- tabl_check$Our_ID[i]
-  }
-}
-
-merg_table <- cbind.data.frame(tabl_check$id, tabl_check$final)
-colnames(merg_table) <- c("id", "UniprotKB")
-
-new_dat <- dat
-new_dat$UniprotKB <- tabl_check$final
-
-hei <- hei %>% 
-  mutate(UniprotKB.x = ifelse((UniprotKB.y=="" || is.na(UniprotKB)),))
-#hei <- merge(dat, merg_table, by="id", all.x = T)
-#dat2 <- left_join(dat, merg_table)
+edges2 <- bind_rows(input_data_edges, df) %>% 
+  distinct(.keep_all = T)
