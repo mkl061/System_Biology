@@ -1,41 +1,67 @@
-is_installed <- function(package_id) {
-  pacs <- installed.packages()[ , "Package"]
-  if (!(package_id %in% pacs)) {
-    install.packages(package_id)
-  } else {
-    cat("The package is installed")
-    return(T)
-  }
+### Packages ----
+
+# Bioconductor (i.e. BiocManager):
+if (!require("BiocManager", quietly = T)) {
+  install.packages("BiocManager", quiet = T)
 }
 
-# Checks if the packages are installed, and installs them if not:
-is_installed("tidyverse")
-is_installed("BiocManager")
-
-if (is_installed("RCy3")) {
+# RCy3:
+if (!require("RCy3", quietly = T)) {
 } else {
   BiocManager::install("RCy3")
 }
 
-# Load the packages:
-library(tidyverse)
-library(RCy3)
 
+# Tidyverse:
+if (!require("tidyverse", quietly = T)) {
+  install.packages("tidyverse", quiet = T)
+}
+
+
+
+### Functions: ----
+# Fucntion that looks throught all characther columns, and removes
+# white spaces at front and end, and convert multiple spaces to single spaces:
+remove_whitespaces <- function(df) {
+  for (col in 1:ncol(df)) {
+    if (is.character(df[,col])) { # Checks if column is of character type
+      df[,col] <- sapply(
+        df[,col],
+        str_squish) # Removes white spaces in front, back and reduce multiple spaces to a single one
+    }
+  }
+  return(df)
+}
+
+
+
+################ NB!! ##################
 # Set working directory:
 #setwd("C:/Users/Legion/Downloads") # Working directory. Change to your directory of choice (e.g. Downloads)
 # NB! Short cut for setting working directory: Ctrl+Shift+H or Cmd+Shift+H
 
 
+
+### Inputs and first tidy-up ----
 # Read the CSVs: OBS! Change "sep" if the CSV file use other separating character, i.e. ","
+
+# Nodes:
 nodes <- read.csv("nodes.csv", sep = ",", header = T, stringsAsFactors = F)
 colnames(nodes)[1] <- "id"
 nodes$Common_name <- nodes$Common_name %>% str_replace("\xa0", "") # Fixing a reocurring problem
 
+nodes <- remove_whitespaces(nodes)
+
+# Edges:
 edges <- read.csv("edges.csv", sep = ",", header = T, stringsAsFactors = F)
 colnames(edges)[1] <- "source"
 colnames(edges)[2] <- "target"
 
+edges <- remove_whitespaces(edges)
 
+
+
+### Adding missing nodes, and standardizations ----
 # Check for uniqueness:
 n_un <- unique(nodes$id)
 e_un <- unique(c(edges$source, edges$target))
@@ -47,8 +73,6 @@ for (i in 1:length(dif)) {
                  )
 }
 
-###
-#nodes <- nodes %>% select(id)
 
 # Standardize activation/inhibition:
 unique(edges$Interaction_result)
@@ -58,15 +82,17 @@ edges$Interaction_result <- edges$Interaction_result %>%
   replace(., . == "up-regulation", "activation")  
 
 
+
+### Cytoscape ----
 # Checks if Cytoscape is open, IF not open Cytoscape first!
 cytoscapePing()
 
 
-# Creates a network in Cytoscape:
+### Creates a network in Cytoscape:
 createNetworkFromDataFrames(nodes, edges)
 
 
-# Create a custom style:
+### Create a custom style:
 my.style <- "group6"
 copyVisualStyle("default", my.style)
 lockNodeDimensions(FALSE, my.style)

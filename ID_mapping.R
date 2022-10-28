@@ -4,7 +4,7 @@
 if (!require("BiocManager", quietly = T)) {
   install.packages("BiocManager", quiet = T)
 }
-BiocManager::install(update = T, ask = F, ... = c(quiet = T))
+#BiocManager::install(update = T, ask = F, ... = c(quiet = T))
 # OBS! The command above usually give a warning, but apparantly this
 # can be ignored. See: https://support.bioconductor.org/p/128825/ 
 
@@ -51,6 +51,23 @@ if (Sys.info()[1] == "Linux") {
 #   return(string)
 # }
 
+
+
+# Fucntion that looks throught all characther columns, and removes
+# white spaces at front and end, and convert multiple spaces to single spaces:
+remove_whitespaces <- function(df) {
+  for (col in 1:ncol(df)) {
+    if (is.character(df[,col])) { # Checks if column is of character type
+      df[,col] <- sapply(
+        df[,col],
+        str_squish) # Removes white spaces in front, back and reduce multiple spaces to a single one
+    }
+  }
+  return(df)
+}
+
+
+
 # Function to reverse all elements in a character column:
 str_rev_in_vec <- function(vec) {
   vec <- vec %>% 
@@ -61,7 +78,11 @@ str_rev_in_vec <- function(vec) {
   return(vec)
 }
 
-# Testing function:
+
+
+
+# Function to collapse strings of two different columns (same row) with
+# specified separator:
 col_splice_to_string <- function(df, row, col1, col2, from_sep, to_sep) {
   first <- df[row, col1] 
   second <- df[row, col2] 
@@ -167,17 +188,6 @@ input_data_nodes <- read.csv("nodes.csv")
 input_data_nodes$Common_name <- input_data_nodes$Common_name %>% str_replace("\xa0", "") # Fixing a reocurring problem
 
 # Tidy up the file by removing unwanted white spaces:
-remove_whitespaces <- function(df) {
-  for (col in 1:ncol(df)) {
-    if (is.character(df[,col])) { # Checks if column is of character type
-      df[,col] <- sapply(
-        df[,col],
-        str_squish) # Removes white spaces in front, back and reduce multiple spaces to a single one
-    }
-  }
-  return(df)
-}
-
 input_data_nodes <- remove_whitespaces(input_data_nodes)
 
 # for (col in 1:ncol(input_data_nodes)) {
@@ -194,6 +204,7 @@ input_data_nodes <- remove_whitespaces(input_data_nodes)
 input_data_edges <- read.csv("edges.csv")
 
 input_data_edges <- remove_whitespaces(input_data_edges)
+
 
 
 ### IDs with biomaRt ----
@@ -510,10 +521,12 @@ add_genes_BioGateway <- function(file, updated_df) {
   
   interpreted_input <- read_BioGateway(input_df)
   
+  return(interpreted_input)
   ### STOPED HERE!
   TF_df <- interpreted_input %>% 
-    filter(int == "tfac2gene")
-  #return(TF_df)
+    filter(int == "tfac2gene") %>% 
+    filter(source %in% updated_df$UniprotKB)
+  return(TF_df)
   
   genes <- interpreted_input %>% 
     filter(int == "gene") %>% # Only the genes
@@ -539,6 +552,12 @@ newest_df <- finished_df %>%
   add_genes_BioGateway("positive regulation of JNK cascade.csv", .) %>% 
   add_genes_BioGateway("interleukin-1-mediated signaling pathway.csv", .)
 
+
+ 
+q <- finished_df %>% 
+  add_genes_BioGateway("positive regulation of JNK cascade.csv", .)
+a <- finished_df %>% 
+  add_genes_BioGateway("positive regulation of JNK cascade.csv", .)
 
 ## Adding all edges for genes encoding proteins:
 genes <- newest_df %>% 
