@@ -17,7 +17,7 @@ OBS! The following isd based on Windows, so use the Mac-version of Ctrl (i.e Cmd
 6. Everything should be updated in Cytoscape when the script is done loading!
 
 
-OBS! The script may take a long time to run the first time bacause it needs to download packages. 
-If nothing happens in Cytoscape the most likely reason is that the CSV file has a seperator other than
-";" (which is the Norwegian defult). The other seperator is ",". So then you need to change the script.
+OBS! The script may take a long time to run the first time because it needs to download packages. 
+If nothing happens in Cytoscape the most likely reason is that the CSV file has a separator other than
+";" (which is the Norwegian default). The other separator is ",". So then you need to change the script.
 It should be clearly marked where.
