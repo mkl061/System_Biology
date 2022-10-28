@@ -11,7 +11,6 @@ if (!require("RCy3", quietly = T)) {
 }
 
 
-
 # Tidyverse:
 if (!require("tidyverse", quietly = T)) {
   install.packages("tidyverse", quiet = T)

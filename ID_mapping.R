@@ -515,66 +515,99 @@ read_BioGateway <- function(df) {
 
 ## Takes the information from the BioGateway file and adds genes that are
 ## not currently in the network:
-add_genes_BioGateway <- function(file, updated_df) {
+add_genes_BioGateway <- function(file, updated_df, add_to) {
   input_df <- read.csv(file) %>% 
     filter(Source.Graph != "prot2bp") # Remove the GO-term information
   
   interpreted_input <- read_BioGateway(input_df)
   
-  return(interpreted_input)
-  ### STOPED HERE!
-  TF_df <- interpreted_input %>% 
-    filter(int == "tfac2gene") %>% 
-    filter(source %in% updated_df$UniprotKB)
-  return(TF_df)
-  
-  genes <- interpreted_input %>% 
-    filter(int == "gene") %>% # Only the genes
-    filter(target %in% swiss_prot$Entry) %>% # Removes those duplicates (i.e. multiple IDs for a single protein)
-    mutate(in_network = ifelse(target %in% updated_df$UniprotKB, T, F)) %>% # Create a new column with T or F depending on protein in network
-    filter(in_network == T) %>% # Only keep those with proteins in network
-    select(-in_network) # Remove the column created earlier
-  
-  sub_df_from_updated_df <- updated_df %>% 
-    filter(UniprotKB %in% genes$target) %>%
-    filter(molecule_type != "gene") %>% # 
-    mutate(molecule_type = "gene",
-           id = str_c(id, "_gene"))
-  
-  return_df <- bind_rows(updated_df, sub_df_from_updated_df) %>% 
-    distinct(.keep_all = T)
-  
-  return(return_df)
+  if (add_to == "nodes") {
+    genes <- interpreted_input %>% 
+      filter(int == "gene") %>% # Only the genes
+      filter(target %in% swiss_prot$Entry) %>% # Removes those duplicates (i.e. multiple IDs for a single protein)
+      mutate(in_network = ifelse(target %in% updated_df$UniprotKB, T, F)) %>% # Create a new column with T or F depending on protein in network
+      filter(in_network == T) %>% # Only keep those with proteins in network
+      dplyr::select(-in_network) # Remove the column created earlier
+    
+    sub_df_from_updated_df <- updated_df %>% 
+      filter(UniprotKB %in% genes$target) %>%
+      filter(molecule_type != "gene") %>% # 
+      mutate(molecule_type = "gene",
+             id = str_c(id, "_gene"))
+    
+    return_df <- bind_rows(updated_df, sub_df_from_updated_df) %>% 
+      distinct(.keep_all = T)
+    
+    return(return_df)
+    
+  } else if (add_to == "edges") {
+    TF_df <- interpreted_input %>% 
+      filter(int == "tfac2gene") # Only include rows regarding transcription regulation
+    
+    unique_genes <- TF_df %>% dplyr::select(target) %>% unique()
+    
+    df <- getBM(attributes = c(
+      "external_gene_name",
+      "uniprotswissprot", # Uniprot ID, from the Swiss-Prot data base
+      "external_synonym"), # I.e. gene synonyms
+      filters = "external_gene_name",
+      values = unique_genes,
+      mart = ensembl.con) 
+    
+    df <- df %>% 
+      filter(uniprotswissprot != "") %>% # Remove rows which don't have a Uniprot ID
+      dplyr::select(-external_synonym) %>% # Remove the synonyms
+      distinct(.keep_all = T) %>% # Remove duplicated rows
+      filter(uniprotswissprot %in% updated_df$UniprotKB) # Keep only those that have proteins in network
+    
+    another_df <- left_join(TF_df, df, by=c("target" = "external_gene_name")) %>% 
+      filter(!is.na(uniprotswissprot)) %>% 
+      left_join(., updated_df[, c("id", "UniprotKB")], by=c("source" = "UniprotKB")) %>% 
+      left_join(., updated_df[, c("id", "UniprotKB")], by=c("uniprotswissprot" = "UniprotKB")) %>% 
+      dplyr::select("source" = id.x, 
+                    "target" = id.y, 
+                    "interaction" = int, 
+                    -source, 
+                    -target, 
+                    -uniprotswissprot) %>% 
+      mutate(Curator = "Marius",
+             Added_from = "BioGateway",
+             target = str_c(target, "_gene"))
+    
+    
+    return_df <- bind_rows(input_data_edges, another_df)
+    return(return_df)
+  }
 }
 
 
 newest_df <- finished_df %>% 
-  add_genes_BioGateway("positive regulation of JNK cascade.csv", .) %>% 
-  add_genes_BioGateway("interleukin-1-mediated signaling pathway.csv", .)
+  add_genes_BioGateway("positive regulation of JNK cascade.csv", ., "nodes") %>% 
+  add_genes_BioGateway("interleukin-1-mediated signaling pathway.csv", ., "nodes")
 
 
  
-q <- finished_df %>% 
-  add_genes_BioGateway("positive regulation of JNK cascade.csv", .)
-a <- finished_df %>% 
-  add_genes_BioGateway("positive regulation of JNK cascade.csv", .)
+newest_edges <- finished_df %>% 
+  add_genes_BioGateway("interleukin-1-mediated signaling pathway.csv", ., "edges")
+
+
 
 ## Adding all edges for genes encoding proteins:
 genes <- newest_df %>% 
   filter(molecule_type == "gene") %>% 
-  select(UniprotKB) %>% 
+  dplyr::select(UniprotKB) %>% 
   pull() 
 
 df <- newest_df %>%
   filter(UniprotKB %in% genes) %>% 
-  select(id, UniprotKB, molecule_type) %>%
+  dplyr::select(id, UniprotKB, molecule_type) %>%
   mutate(molecule_type = ifelse(molecule_type == "gene", "source", "target")) %>%
   group_by(molecule_type) %>% pivot_wider(names_from =  molecule_type, values_from = id) %>% 
   mutate(interaction = "encodes",
          Added.from = "BioGateway",
          Curator = "Marius") %>% 
-  select(-UniprotKB) %>% 
+  dplyr::select(-UniprotKB) %>% 
   relocate(source, target)
 
-edges2 <- bind_rows(input_data_edges, df) %>% 
+edges2 <- bind_rows(newest_edges, df) %>% 
   distinct(.keep_all = T)
