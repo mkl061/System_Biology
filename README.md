@@ -21,3 +21,9 @@ OBS! The script may take a long time to run the first time because it needs to d
 If nothing happens in Cytoscape the most likely reason is that the CSV file has a separator other than
 ";" (which is the Norwegian default). The other separator is ",". So then you need to change the script.
 It should be clearly marked where.
+
+
+The packages used for this project are:
+- Tidyverse (mainly; dplyr, tidyr, stringr)
+- BiocManager (i.e. BioConductor)
+- biomaRt (i.e. Ensembl BioMart)
