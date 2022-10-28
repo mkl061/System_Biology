@@ -7,9 +7,9 @@ if (!require("BiocManager", quietly = T)) {
 
 # RCy3:
 if (!require("RCy3", quietly = T)) {
-} else {
   BiocManager::install("RCy3")
 }
+
 
 
 # Tidyverse:
