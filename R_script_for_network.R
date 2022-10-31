@@ -45,14 +45,14 @@ remove_whitespaces <- function(df) {
 # Read the CSVs: OBS! Change "sep" if the CSV file use other separating character, i.e. ","
 
 # Nodes:
-nodes <- read.csv("nodes.csv", sep = ",", header = T, stringsAsFactors = F)
+nodes <- read.csv("nodes2.csv", sep = ",", header = T, stringsAsFactors = F)
 colnames(nodes)[1] <- "id"
 nodes$Common_name <- nodes$Common_name %>% str_replace("\xa0", "") # Fixing a reocurring problem
 
 nodes <- remove_whitespaces(nodes)
 
 # Edges:
-edges <- read.csv("edges.csv", sep = ",", header = T, stringsAsFactors = F)
+edges <- read.csv("edges2.csv", sep = ",", header = T, stringsAsFactors = F)
 colnames(edges)[1] <- "source"
 colnames(edges)[2] <- "target"
 
@@ -78,7 +78,7 @@ unique(edges$Interaction_result)
 edges$Interaction_result <- edges$Interaction_result %>% 
   replace(., . == "deactivation", "inhibits") %>% 
   replace(., . == "inactivation", "inhibits") %>% 
-  replace(., . == "up-regulation", "activation")  
+  replace(., . == "up-regulation", "activation")
 
 
 
@@ -101,14 +101,14 @@ lockNodeDimensions(FALSE, my.style)
 unique(nodes$molecule_type) # Checks what the categories are
 setNodeColorMapping("molecule_type", 
                     style.name = my.style,
-                    table.column.values = c("complex", "protein"), 
+                    table.column.values = c("complex", "protein", "gene"), 
                     mapping.type = "d", 
-                    colors = c("#789ef5", "#a0b9f2"))
+                    colors = c("#789ef5", "#a0b9f2", "#ffff99"))
 
 setNodeShapeMapping("molecule_type", 
                     style.name = my.style, 
-                    table.column.values = c("protein", "complex"),
-                    shapes = c("ROUND_RECTANGLE", "HEXAGON"))
+                    table.column.values = c("protein", "complex", "gene"),
+                    shapes = c("ROUND_RECTANGLE", "HEXAGON", "ELLIPSE"))
 
 setEdgeTargetArrowMapping("Interaction_result", 
                           style.name = my.style, 

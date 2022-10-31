@@ -23,6 +23,7 @@ if (!require("tidyverse", quietly = T)) {
 }
 
 
+
 ### Working directory ----
 if (Sys.info()[1] == "Linux") {
   setwd("/mnt/chromeos/MyFiles/Downloads")
@@ -179,6 +180,25 @@ col_splice_to_string <- function(df, row, col1, col2, from_sep, to_sep) {
 
 
 
+
+# Function that will be used to fill cells of one column if the cell contain
+# either NA or "": 
+fill_cells <- function(to_col, from_col) {
+  ret_col <- ifelse(
+    is.na(to_col) == T,
+    from_col,
+    ifelse(
+      to_col == "",
+      from_col,
+      to_col
+    )
+  )
+  
+  return(ret_col)
+}
+
+
+
 ### Input data ----
 ## Nodes:
 
@@ -213,7 +233,11 @@ input_data_edges <- remove_whitespaces(input_data_edges)
 # datasets <- listDatasets(ensembl)
 
 # Use only entries from Homo sapiens:
-ensembl.con <- useMart("ensembl", dataset = "hsapiens_gene_ensembl")
+# NB! This step takes a while, so I put it in an if-statement so that
+# it doesn't have to run each time if its already in the global environment.
+if ("ensembl.con" %in% ls() == F) {
+  ensembl.con <- useMart("ensembl", dataset = "hsapiens_gene_ensembl")
+}
 
 # attributes <- listAttributes(ensembl.con)
 # filters <- listFilters(ensembl.con)
@@ -225,10 +249,14 @@ multiple_ids <- getBM(attributes = c(
   "uniprotswissprot", # Uniprot ID, from the Swiss-Prot data base
   "entrezgene_id", # I.e. NCBI gene ID
   "external_gene_name", # I.e. Gene symbol 
+  "ensembl_gene_id", # Ensembl IDs
   "hgnc_id"), # I.e. HGCN ID
       filters = "uniprotswissprot",
       values = input_data_nodes$UniprotKB,
-      mart = ensembl.con)
+      mart = ensembl.con) %>% 
+  mutate(dup = duplicated(uniprotswissprot)) %>% # OBS! Because Ensemble have multiple IDs per protein, we choose to only keep one
+  filter(dup != T) %>% 
+  dplyr::select(-dup)
 
 # Creates a data frame with all the synonyms:
 # Each synonym has its own row, meaning that there are multiple rows
@@ -300,8 +328,8 @@ Uniprot_IDs <- input_data_nodes %>%
   dplyr::select(UniprotKB) %>% 
   pull() # Results in character vector
 
-# Subset of swiss_prot df:
-sub_df <- swiss_prot %>% .[.$Entry %in% Uniprot_IDs, ] # Only data for our proteins
+# Subset of swiss_prot df, with only IDs equal to those in our input data:
+sub_df <- swiss_prot %>% .[.$Entry %in% Uniprot_IDs, ]
 
 # Create new columns:
 sub_df$protein_name <- NA
@@ -385,6 +413,7 @@ for (row in 1:nrow(sub_df)) { # Iterate through all the rows
 }
 
 
+# Create a new data frame with only the interesting to us:
 Swiss_df <- sub_df %>% 
   dplyr::select(Entry, 
                 protein_name, 
@@ -407,9 +436,9 @@ rm(
 
 ## Double merge, the BioMart_df and Swiss_df, to the input_data_nodes df:
 merge_df <- input_data_nodes %>% 
-  left_join(., BioMart_df,
+  left_join(., BioMart_df, # First merging the input_data_nodes with BioMart_df
             by=c("UniprotKB" = "uniprotswissprot")) %>% 
-  left_join(., Swiss_df,
+  left_join(., Swiss_df, # Then merging the previosly created df with Swiss_df
             by=c("UniprotKB" = "Entry"))
 
 
@@ -431,24 +460,42 @@ for (i in 1:nrow(merge_df)) {
 
 
 
+#
 finished_df <- merge_df %>% 
-  mutate(final_name = ifelse(
-    Common_name == "", 
-    protein_name, 
-    Common_name)) %>% 
-  dplyr::select(
+  mutate(
+    Common_name = fill_cells(Common_name, protein_name),
+    NCBI_gene = fill_cells(NCBI_gene, entrezgene_id),
+    Ensembl = fill_cells(Ensembl, ensembl_gene_id),
+    HGNC = fill_cells(HGNC, hgnc_id),
+    Origin = ifelse(is.na(Origin), "added", ifelse(Origin == "", "added", Origin)),
+    Curator = str_to_title(Curator)
+    ) %>% 
+  select(
     id,
     Common_name,
     UniprotKB,
-    "protein_synonyms" = protein_synonyms_swiss,
+    molecule_type,
     "gene_synonyms" = final_gene_syn,
-    molecule_type
+    "protein_synonyms" = protein_synonyms_swiss,
+    Interleukine.1.signaling,
+    TNF.alpha.Signaling,
+    JNK.signaling,
+    Reactome_ID,
+    Signor_ID,
+    Ensembl,
+    HGNC,
+    NCBI_gene,
+    Added_from,
+    Curator
   )
+  
 
 
 
 ## Tidy up:
 rm(merge_df)
+
+
 
 ### Result from BioGateway query ----
 ## Reads a BioGateway network's edge table. 
@@ -581,33 +628,48 @@ add_genes_BioGateway <- function(file, updated_df, add_to) {
 }
 
 
-newest_df <- finished_df %>% 
+newest_nodes <- finished_df %>% 
   add_genes_BioGateway("positive regulation of JNK cascade.csv", ., "nodes") %>% 
-  add_genes_BioGateway("interleukin-1-mediated signaling pathway.csv", ., "nodes")
+  add_genes_BioGateway("interleukin-1-mediated signaling pathway.csv", ., "nodes") %>% 
+  add_genes_BioGateway("apoptotic process.csv", ., "nodes")
 
 
  
-newest_edges <- finished_df %>% 
-  add_genes_BioGateway("interleukin-1-mediated signaling pathway.csv", ., "edges")
+newest_edges <- add_genes_BioGateway("positive regulation of JNK cascade.csv", finished_df, "edges") %>% 
+  bind_rows(., add_genes_BioGateway("interleukin-1-mediated signaling pathway.csv", finished_df, "edges")) %>% 
+  bind_rows(., add_genes_BioGateway("apoptotic process.csv", finished_df, "edges")) %>% 
+  distinct(.keep_all = T)
 
 
 
 ## Adding all edges for genes encoding proteins:
-genes <- newest_df %>% 
+# Finding all genes in the spreadsheet:
+genes <- newest_nodes %>% 
   filter(molecule_type == "gene") %>% 
   dplyr::select(UniprotKB) %>% 
   pull() 
 
-df <- newest_df %>%
-  filter(UniprotKB %in% genes) %>% 
+# Creating a data frame from the nodes table, and reorganize it to be similar
+# to the edge table:
+df <- newest_nodes %>%
+  filter(UniprotKB %in% genes) %>%
   dplyr::select(id, UniprotKB, molecule_type) %>%
   mutate(molecule_type = ifelse(molecule_type == "gene", "source", "target")) %>%
   group_by(molecule_type) %>% pivot_wider(names_from =  molecule_type, values_from = id) %>% 
   mutate(interaction = "encodes",
-         Added.from = "BioGateway",
+         Added_from = "BioGateway",
          Curator = "Marius") %>% 
   dplyr::select(-UniprotKB) %>% 
   relocate(source, target)
 
-edges2 <- bind_rows(newest_edges, df) %>% 
+# Add the data frame just created to the edge data frame:
+newest_edges <- bind_rows(newest_edges, df) %>% 
   distinct(.keep_all = T)
+
+
+# write.csv(newest_nodes, str_c(getwd(), "/new_nodes.csv"), row.names = F)
+# write.csv(newest_edges, str_c(getwd(), "/new_edges.csv"), row.names = F)
+
+
+
+
