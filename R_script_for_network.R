@@ -95,7 +95,7 @@ createNetworkFromDataFrames(nodes, edges)
 
 
 
-my.style <- "group6"
+my.style <- "Marius_style"
 if (my.style %in% getVisualStyleNames() == F) {
   ### Create a custom style: Use: getVisualPropertyNames()
   

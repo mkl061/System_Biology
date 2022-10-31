@@ -219,7 +219,7 @@ input_data_edges <- remove_whitespaces(input_data_edges)
 
 # Fix capital letter in name:
 input_data_edges <- input_data_edges %>% 
-  mutate(str_to_title(Curator))
+  mutate(Curator = str_to_title(Curator))
 
 
 ### IDs with biomaRt ----
