@@ -45,14 +45,14 @@ remove_whitespaces <- function(df) {
 # Read the CSVs: OBS! Change "sep" if the CSV file use other separating character, i.e. ","
 
 # Nodes:
-nodes <- read.csv("nodes2.csv", sep = ",", header = T, stringsAsFactors = F)
+nodes <- read.csv("new_nodes.csv", sep = ",", header = T, stringsAsFactors = F)
 colnames(nodes)[1] <- "id"
-nodes$Common_name <- nodes$Common_name %>% str_replace("\xa0", "") # Fixing a reocurring problem
+nodes$Common_name <- nodes$Common_name %>% str_replace("\xa0", "") # Fixing a recurring problem
 
 nodes <- remove_whitespaces(nodes)
 
 # Edges:
-edges <- read.csv("edges2.csv", sep = ",", header = T, stringsAsFactors = F)
+edges <- read.csv("new_edges.csv", sep = ",", header = T, stringsAsFactors = F)
 colnames(edges)[1] <- "source"
 colnames(edges)[2] <- "target"
 
@@ -66,11 +66,14 @@ n_un <- unique(nodes$id)
 e_un <- unique(c(edges$source, edges$target))
 dif <- setdiff(e_un, n_un) # Contain elements of edges (source or target) which is not part of nodes
 # Ads the missing nodes:
-for (i in 1:length(dif)) {
-  nodes <- rbind(nodes,
-                 c(dif[i], rep("", times=ncol(nodes)-1))
-                 )
+if (length(dif) > 0) {
+  for (i in 1:length(dif)) {
+    nodes <- rbind(nodes,
+                   c(dif[i], rep("", times=ncol(nodes)-1))
+    )
+  }  
 }
+
 
 
 # Standardize activation/inhibition:
@@ -91,42 +94,76 @@ cytoscapePing()
 createNetworkFromDataFrames(nodes, edges)
 
 
-### Create a custom style:
+
 my.style <- "group6"
-copyVisualStyle("default", my.style)
+if (my.style %in% getVisualStyleNames() == F) {
+  ### Create a custom style: Use: getVisualPropertyNames()
+  
+  
+  
+  defaults <- list(NODE_SHAPE="ROUND_RECTANGLE",
+                   NODE_HEIGHT = 35,
+                   NODE_WIDTH = 75,
+                   EDGE_TRANSPARENCY=255,
+                   EDGE_WIDTH = 1.5)
+  
+  nodeLabels <- mapVisualProperty('node label',
+                                  'id',
+                                  'p')
+  
+  nodeShape <- mapVisualProperty("NODE_SHAPE",
+                                 'molecule_type',
+                                 'd',
+                                 c("protein", "complex", "TF", "gene"), 
+                                 c("ROUND_RECTANGLE", "HEXAGON", "ROUND_RECTANGLE", "ELLIPSE"))
+  
+  nodeFills <- mapVisualProperty('node fill color',
+                                 'molecule_type',
+                                 'd',
+                                 c("protein", "complex", "TF", "gene"), 
+                                 c("#a0b9f2","#789ef5", "#ff5a36", "#ffff99"))
+  
+  arrowShapes <- mapVisualProperty("EDGE_TARGET_ARROW_SHAPE",
+                                   'Interaction_result',
+                                   'd',
+                                   c("activation","inhibits","interacts", ""),
+                                   c("Arrow","T","None", "None"))
+  
+  arrowType <- mapVisualProperty("EDGE_LINE_TYPE",
+                                 "interaction",
+                                 "d",
+                                 c("pp", "tfac2gene", "encodes"),
+                                 c("SOLID", "VERTICAL_SLASH", "SEPARATE_ARROW"))
+  
+  arrowColor <- mapVisualProperty("EDGE_STROKE_UNSELECTED_PAINT",
+                                  "Interaction_result",
+                                  "d",
+                                  c("activation", "inhibits", "interacts", ""),
+                                  c("#1fb805", "#d60000", "#4e4e4e", "#4e4e4e"))
+  
+  arrowTargetColor <- mapVisualProperty("EDGE_TARGET_ARROW_UNSELECTED_PAINT",
+                                        "Interaction_result",
+                                        "d",
+                                        c("activation","inhibits","interacts", ""),
+                                        c("#1fb805", "#d60000", "#4e4e4e", "#4e4e4e"))
+  
+  edgeWidth <- mapVisualProperty('edge width', 
+                                 "interaction",
+                                 'd', 
+                                 table.column.values = c("pp"), 
+                                 visual.prop.values = c(2))
+  
+  
+  createVisualStyle(my.style, defaults, list(nodeLabels,
+                                             nodeShape,
+                                             nodeFills,
+                                             arrowShapes,
+                                             arrowType,
+                                             arrowColor,
+                                             arrowTargetColor,
+                                             edgeWidth))
+  
+}
+
+setVisualStyle(my.style)
 lockNodeDimensions(FALSE, my.style)
-
-
-# Mapping:
-unique(nodes$molecule_type) # Checks what the categories are
-setNodeColorMapping("molecule_type", 
-                    style.name = my.style,
-                    table.column.values = c("complex", "protein", "gene"), 
-                    mapping.type = "d", 
-                    colors = c("#789ef5", "#a0b9f2", "#ffff99"))
-
-setNodeShapeMapping("molecule_type", 
-                    style.name = my.style, 
-                    table.column.values = c("protein", "complex", "gene"),
-                    shapes = c("ROUND_RECTANGLE", "HEXAGON", "ELLIPSE"))
-
-setEdgeTargetArrowMapping("Interaction_result", 
-                          style.name = my.style, 
-                          table.column.values = c("inhibits", "activation", ""), 
-                          shapes = c("T", "ARROW", "NONE"))
-
-setEdgeTargetArrowColorMapping("Interaction_result", 
-                               style.name = my.style, 
-                               table.column.values = c(
-                                 "inhibits", 
-                                 "activation", 
-                                 ""), 
-                               mapping.type = "d", 
-                               colors = c("#a1453d", "#5ea63f", "#d6d6d6"))
-
-setEdgeColorMapping("Interaction_result", 
-                    style.name = my.style, 
-                    table.column.values = c("inhibits", "activation", ""), 
-                    mapping.type = "d", 
-                    colors = c("#a1453d", "#5ea63f", "#d6d6d6"))
-

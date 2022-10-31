@@ -210,14 +210,6 @@ input_data_nodes$Common_name <- input_data_nodes$Common_name %>% str_replace("\x
 # Tidy up the file by removing unwanted white spaces:
 input_data_nodes <- remove_whitespaces(input_data_nodes)
 
-# for (col in 1:ncol(input_data_nodes)) {
-#   if (is.character(input_data_nodes[,col])) { # Checks if column is of character type
-#     input_data_nodes[,col] <- sapply(input_data_nodes[,col], 
-#                                    str_squish) # Removes white spaces in front, back and reduce multiple spaces to a single one
-#   }
-# }
-
-#rm(col) # Remove the stored variable (generated in for-loop)
 
 
 ## Edges:
@@ -225,6 +217,9 @@ input_data_edges <- read.csv("edges.csv")
 
 input_data_edges <- remove_whitespaces(input_data_edges)
 
+# Fix capital letter in name:
+input_data_edges <- input_data_edges %>% 
+  mutate(str_to_title(Curator))
 
 
 ### IDs with biomaRt ----
@@ -324,7 +319,8 @@ if ("Swiss_Prot.tsv" %in% dir()) {
 
 
 # All the Uniprot IDs from the spreadsheet:
-Uniprot_IDs <- input_data_nodes %>% 
+Uniprot_IDs <- input_data_nodes %>%
+  filter(UniprotKB != "") %>% 
   dplyr::select(UniprotKB) %>% 
   pull() # Results in character vector
 
@@ -423,6 +419,7 @@ Swiss_df <- sub_df %>%
 
 ## Tidy up:
 rm(
+  Uniprot_IDs,
   sub_df,
   string, 
   p_name, 
@@ -477,6 +474,7 @@ finished_df <- merge_df %>%
     molecule_type,
     "gene_synonyms" = final_gene_syn,
     "protein_synonyms" = protein_synonyms_swiss,
+    Receptor_or_Ligand,
     Interleukine.1.signaling,
     TNF.alpha.Signaling,
     JNK.signaling,
@@ -486,6 +484,7 @@ finished_df <- merge_df %>%
     HGNC,
     NCBI_gene,
     Added_from,
+    Origin,
     Curator
   )
   
@@ -548,7 +547,7 @@ read_BioGateway <- function(df) {
     str_sub(end = cut3) %>% 
     str_rev_in_vec()
   
-  # Create a data frame with the source, tatget, and interaction type:
+  # Create a data frame with the source, target, and interaction type:
   df <- cbind.data.frame(
     "source"=unlist(source),
     "target"=unlist(target),
@@ -580,7 +579,9 @@ add_genes_BioGateway <- function(file, updated_df, add_to) {
       filter(UniprotKB %in% genes$target) %>%
       filter(molecule_type != "gene") %>% # 
       mutate(molecule_type = "gene",
-             id = str_c(id, "_gene"))
+             id = str_c(id, "_gene"),
+             Curator = "Marius",
+             Receptor_or_Ligand = "")
     
     return_df <- bind_rows(updated_df, sub_df_from_updated_df) %>% 
       distinct(.keep_all = T)
@@ -667,8 +668,8 @@ newest_edges <- bind_rows(newest_edges, df) %>%
   distinct(.keep_all = T)
 
 
-# write.csv(newest_nodes, str_c(getwd(), "/new_nodes.csv"), row.names = F)
-# write.csv(newest_edges, str_c(getwd(), "/new_edges.csv"), row.names = F)
+write.csv(newest_nodes, str_c(getwd(), "/new_nodes.csv"), row.names = F)
+write.csv(newest_edges, str_c(getwd(), "/new_edges.csv"), row.names = F)
 
 
 
