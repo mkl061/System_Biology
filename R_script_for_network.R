@@ -41,18 +41,80 @@ remove_whitespaces <- function(df) {
 
 
 
+#### Omics data ----
+# GSE14905:
+GSE14905 <- read.csv("GSE14905.csv")[,1:3] # The file should only contain 3 columns
+# COAD_CMS2:
+COAD_CMS2 <- read.csv("COAD_CMS2.csv")[,1:3]
+# TCGA_BRCA:
+TCGA_BRCA <- read.csv("TCGA_BRCA.csv")[,1:3]
+# GSE120245:
+GSE120245 <- read.csv("GSE120245.csv")[,1:3]
+
+
+
+
 ### Inputs and first tidy-up ----
 # Read the CSVs: OBS! Change "sep" if the CSV file use other separating character, i.e. ","
 
-# Nodes:
+## Nodes:
 nodes <- read.csv("new_nodes.csv", sep = ",", header = T, stringsAsFactors = F)
+
+# General tidying up:
 colnames(nodes)[1] <- "id"
 nodes$Common_name <- nodes$Common_name %>% str_replace("\xa0", "") # Fixing a recurring problem
 
-nodes <- remove_whitespaces(nodes)
+nodes <- remove_whitespaces(nodes) # Remove all whitespaces where there should be none
 
-# Edges:
+
+# Incorporate omics data:
+inc_omics <- function(df, omics_df) {
+  # Edit the column names of the omics df to identify the source of the
+  # omics data:
+  
+  df.name <- deparse(substitute(omics_df))
+  colnames(omics_df)[2] <- str_c("logFC_", df.name)
+  colnames(omics_df)[3] <- str_c("FDR_", df.name)
+  
+  # Join the data frames
+  df <- df %>% 
+    left_join(., omics_df, by=c("hgnc_symbol" = "hgnc_symbol"))
+  
+  return(df)
+}
+
+
+# Use the function to merge the dfs
+nodes <- nodes %>% 
+  inc_omics(GSE14905) %>% 
+  inc_omics(COAD_CMS2) %>% 
+  inc_omics(TCGA_BRCA) %>% 
+  inc_omics(GSE120245) 
+
+
+# Obs! The RCy3 package and Cytoscape struggles with changing the column
+# type (e.g. string -> numeric). The following lines of code will create a
+# dummy row with values just to force the column type. The mentioned row
+# will be removed after the network is created, by other lines of code.
+test_row <- rep(NA, ncol(nodes))
+test_row[1] <- 12345
+
+col_index <- colnames(nodes)[
+  str_detect(colnames(nodes), "logFC") | str_detect(colnames(nodes), "FDR")
+  ] %>% 
+  sapply(., grep, colnames(nodes)) %>% 
+  as.vector()
+
+test_row[col_index] <- 1.1
+
+nodes <- rbind(test_row, nodes[1:nrow(nodes), ])
+
+
+
+## Edges:
 edges <- read.csv("new_edges.csv", sep = ",", header = T, stringsAsFactors = F)
+
+# General tyding up: 
 colnames(edges)[1] <- "source"
 colnames(edges)[2] <- "target"
 
@@ -77,11 +139,11 @@ if (length(dif) > 0) {
 
 
 # Standardize activation/inhibition:
-unique(edges$Interaction_result)
-edges$Interaction_result <- edges$Interaction_result %>% 
-  replace(., . == "deactivation", "inhibits") %>% 
-  replace(., . == "inactivation", "inhibits") %>% 
-  replace(., . == "up-regulation", "activation")
+# unique(edges$Interaction_result)
+# edges$Interaction_result <- edges$Interaction_result %>% 
+#   replace(., . == "deactivation", "inhibits") %>% 
+#   replace(., . == "inactivation", "inhibits") %>% 
+#   replace(., . == "up-regulation", "activation")
 
 
 
@@ -91,15 +153,22 @@ cytoscapePing()
 
 
 ### Creates a network in Cytoscape:
-createNetworkFromDataFrames(nodes, edges)
+today <- Sys.Date() %>% # Finds today's date
+  format(format="%d.%m.%Y") # Date on format: dd.mm.yyyy
+
+# The network creation code-line:
+createNetworkFromDataFrames(nodes, edges, 
+                            str_c("NETWORK GROUP 6, updated: ", today)
+                            )
+
+# Remove the dummy-row:
+selectNodes("12345", "id")
+deleteSelectedNodes()
 
 
-
-my.style <- "Marius_style"
+# Generate a custom style:
+my.style <- "Group6_style"
 if (my.style %in% getVisualStyleNames() == F) {
-  ### Create a custom style: Use: getVisualPropertyNames()
-  
-  
   
   defaults <- list(NODE_SHAPE="ROUND_RECTANGLE",
                    NODE_HEIGHT = 35,
@@ -165,5 +234,9 @@ if (my.style %in% getVisualStyleNames() == F) {
   
 }
 
+# Apply the visual style:
 setVisualStyle(my.style)
 lockNodeDimensions(FALSE, my.style)
+
+# Saves the file, with overwrite previalages:
+saveSession("Updated_network")

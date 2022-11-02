@@ -234,24 +234,37 @@ if ("ensembl.con" %in% ls() == F) {
   ensembl.con <- useMart("ensembl", dataset = "hsapiens_gene_ensembl")
 }
 
-# attributes <- listAttributes(ensembl.con)
+#attributes <- listAttributes(ensembl.con)
 # filters <- listFilters(ensembl.con)
 
 # Get IDs from other data bases, using the biomaRt package:
 # OBS! This data frame will contain duplications, because
 # some proteins may have multiple IDs within the same data bases.
-multiple_ids <- getBM(attributes = c(
+multiple_ids1 <- getBM(attributes = c(
   "uniprotswissprot", # Uniprot ID, from the Swiss-Prot data base
   "entrezgene_id", # I.e. NCBI gene ID
   "external_gene_name", # I.e. Gene symbol 
-  "ensembl_gene_id", # Ensembl IDs
-  "hgnc_id"), # I.e. HGCN ID
+  "ensembl_gene_id"), # I.e. Gene symbol as reported in HGCN
       filters = "uniprotswissprot",
       values = input_data_nodes$UniprotKB,
       mart = ensembl.con) %>% 
   mutate(dup = duplicated(uniprotswissprot)) %>% # OBS! Because Ensemble have multiple IDs per protein, we choose to only keep one
   filter(dup != T) %>% 
   dplyr::select(-dup)
+
+multiple_ids2 <- getBM(attributes = c(
+  "uniprotswissprot", # Uniprot ID, from the Swiss-Prot data base
+  "hgnc_id",
+  "hgnc_symbol"), # I.e. Gene symbol as reported in HGCN
+      filters = "uniprotswissprot",
+      values = input_data_nodes$UniprotKB,
+      mart = ensembl.con) %>% 
+  mutate(dup = duplicated(uniprotswissprot)) %>% # OBS! Because Ensemble have multiple IDs per protein, we choose to only keep one
+  filter(dup != T) %>% 
+  dplyr::select(-dup)
+
+
+multiple_ids <- left_join(multiple_ids1, multiple_ids2, by=c("uniprotswissprot" = "uniprotswissprot"))
 
 # Creates a data frame with all the synonyms:
 # Each synonym has its own row, meaning that there are multiple rows
@@ -435,7 +448,7 @@ rm(
 merge_df <- input_data_nodes %>% 
   left_join(., BioMart_df, # First merging the input_data_nodes with BioMart_df
             by=c("UniprotKB" = "uniprotswissprot")) %>% 
-  left_join(., Swiss_df, # Then merging the previosly created df with Swiss_df
+  left_join(., Swiss_df, # Then merging the previously created df with Swiss_df
             by=c("UniprotKB" = "Entry"))
 
 
@@ -471,6 +484,7 @@ finished_df <- merge_df %>%
     id,
     Common_name,
     UniprotKB,
+    hgnc_symbol,
     molecule_type,
     "gene_synonyms" = final_gene_syn,
     "protein_synonyms" = protein_synonyms_swiss,
@@ -581,7 +595,10 @@ add_genes_BioGateway <- function(file, updated_df, add_to) {
       mutate(molecule_type = "gene",
              id = str_c(id, "_gene"),
              Curator = "Marius",
-             Receptor_or_Ligand = "")
+             Receptor_or_Ligand = "",
+             Origin = "added",
+             Reactome_ID = NA,
+             Signor_ID = NA)
     
     return_df <- bind_rows(updated_df, sub_df_from_updated_df) %>% 
       distinct(.keep_all = T)
@@ -670,7 +687,3 @@ newest_edges <- bind_rows(newest_edges, df) %>%
 
 write.csv(newest_nodes, str_c(getwd(), "/new_nodes.csv"), row.names = F)
 write.csv(newest_edges, str_c(getwd(), "/new_edges.csv"), row.names = F)
-
-
-
-
