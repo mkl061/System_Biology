@@ -5,7 +5,7 @@ if (!require("BiocManager", quietly = T)) {
   install.packages("BiocManager", quiet = T)
 }
 #BiocManager::install(update = T, ask = F, ... = c(quiet = T))
-# OBS! The command above usually give a warning, but apparantly this
+# OBS! The command above usually give a warning, but apparently this
 # can be ignored. See: https://support.bioconductor.org/p/128825/ 
 
 
@@ -22,14 +22,23 @@ if (!require("tidyverse", quietly = T)) {
   install.packages("tidyverse", quiet = T)
 }
 
+# Readxl (NB! Is part of tidyverse, but needs to be loaded separately)
+if (!require("readxl", quietly = T)) {
+  install.packages("readxl", quiet = T)
+}
+
 
 
 ### Working directory ----
-if (Sys.info()[1] == "Linux") {
-  setwd("/mnt/chromeos/MyFiles/Downloads")
-} else if (Sys.info()[1] == "Windows") {
+if (Sys.info()["nodename"] == "MARIUSPC") {
   setwd("C:/Users/Legion/Downloads")
 }
+
+# if (Sys.info()[1] == "Linux") {
+#   setwd("/mnt/chromeos/MyFiles/Downloads")
+# } else if (Sys.info()[1] == "Windows") {
+#   setwd("C:/Users/Legion/Downloads")
+# }
 
 
 ### Custom function ----
@@ -203,7 +212,13 @@ fill_cells <- function(to_col, from_col) {
 ## Nodes:
 
 # Read files:
-input_data_nodes <- read.csv("nodes.csv")
+#input_data_nodes <- read.csv("nodes.csv")
+files <- dir(pattern = ".xlsx")
+files <- files[str_starts(files, "Project_workbook")]
+mtimes <- file.mtime(files) %>% order()
+file <- files[mtimes][length(files)]
+
+input_data_nodes <- read_excel(file, sheet = "nodes")
 
 input_data_nodes$Common_name <- input_data_nodes$Common_name %>% str_replace("\xa0", "") # Fixing a reocurring problem
 
@@ -213,7 +228,9 @@ input_data_nodes <- remove_whitespaces(input_data_nodes)
 
 
 ## Edges:
-input_data_edges <- read.csv("edges.csv")
+#input_data_edges <- read.csv("edges.csv")
+
+input_data_edges <- read_excel(file, sheet = "edges")
 
 input_data_edges <- remove_whitespaces(input_data_edges)
 
@@ -480,7 +497,7 @@ finished_df <- merge_df %>%
     Origin = ifelse(is.na(Origin), "added", ifelse(Origin == "", "added", Origin)),
     Curator = str_to_title(Curator)
     ) %>% 
-  select(
+  dplyr::select(
     id,
     Common_name,
     UniprotKB,

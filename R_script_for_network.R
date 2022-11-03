@@ -5,6 +5,8 @@ if (!require("BiocManager", quietly = T)) {
   install.packages("BiocManager", quiet = T)
 }
 
+
+
 # RCy3:
 if (!require("RCy3", quietly = T)) {
   BiocManager::install("RCy3")
@@ -38,7 +40,9 @@ remove_whitespaces <- function(df) {
 # Set working directory:
 #setwd("C:/Users/Legion/Downloads") # Working directory. Change to your directory of choice (e.g. Downloads)
 # NB! Short cut for setting working directory: Ctrl+Shift+H or Cmd+Shift+H
-
+if (Sys.info()["nodename"] == "MARIUSPC") {
+  setwd("C:/Users/Legion/Downloads")
+}
 
 
 #### Omics data ----
@@ -140,10 +144,9 @@ if (length(dif) > 0) {
 
 # Standardize activation/inhibition:
 # unique(edges$Interaction_result)
-# edges$Interaction_result <- edges$Interaction_result %>% 
-#   replace(., . == "deactivation", "inhibits") %>% 
-#   replace(., . == "inactivation", "inhibits") %>% 
-#   replace(., . == "up-regulation", "activation")
+edges$Interaction_result <- edges$Interaction_result %>%
+  replace(., . == "deactivation", "inhibits") %>%
+  replace(., . == "inactivation", "inhibits")
 
 
 
