@@ -30,15 +30,15 @@ if (!require("readxl", quietly = T)) {
 
 
 ### Working directory ----
-if (Sys.info()["nodename"] == "MARIUSPC") {
+if (Sys.info()["nodename"] == "MARIUSPC") { # Marius 1
   setwd("C:/Users/Legion/Downloads")
+} else if (Sys.info()["nodename"] == "penguin") { # Marius 2
+  setwd("/mnt/chromeos/MyFiles/Downloads")
+} else if (Sys.info()["nodename"] == "dhcp-10-22-28-162.wlan.ntnu.no") { # Jann
+  setwd("~/Desktop/run everything")
+} else if (Sys.info()["nodename"] == "LAPTOP-3BEG4HPK") { # Vibeke
+  setwd("C:/Users/Vibeke/Downloads")
 }
-
-# if (Sys.info()[1] == "Linux") {
-#   setwd("/mnt/chromeos/MyFiles/Downloads")
-# } else if (Sys.info()[1] == "Windows") {
-#   setwd("C:/Users/Legion/Downloads")
-# }
 
 
 ### Custom function ----
@@ -220,7 +220,8 @@ file <- files[mtimes][length(files)]
 
 input_data_nodes <- read_excel(file, sheet = "nodes")
 
-input_data_nodes$Common_name <- input_data_nodes$Common_name %>% str_replace("\xa0", "") # Fixing a reocurring problem
+#input_data_nodes$Common_name <- input_data_nodes$Common_name %>% str_replace("\xa0", "") # Fixing a reocurring problem
+
 
 # Tidy up the file by removing unwanted white spaces:
 input_data_nodes <- remove_whitespaces(input_data_nodes)
@@ -239,6 +240,11 @@ input_data_edges <- input_data_edges %>%
   mutate(Curator = str_to_title(Curator))
 
 
+# Tidy up:
+rm(files, file, mtimes)
+
+
+
 ### IDs with biomaRt ----
 # listEnsembl()
 # ensembl <- useEnsembl(biomart = "genes")
@@ -251,44 +257,54 @@ if ("ensembl.con" %in% ls() == F) {
   ensembl.con <- useMart("ensembl", dataset = "hsapiens_gene_ensembl")
 }
 
-#attributes <- listAttributes(ensembl.con)
+# attributes <- listAttributes(ensembl.con)
 # filters <- listFilters(ensembl.con)
 
 # Get IDs from other data bases, using the biomaRt package:
 # OBS! This data frame will contain duplications, because
 # some proteins may have multiple IDs within the same data bases.
-multiple_ids1 <- getBM(attributes = c(
-  "uniprotswissprot", # Uniprot ID, from the Swiss-Prot data base
-  "entrezgene_id", # I.e. NCBI gene ID
-  "external_gene_name", # I.e. Gene symbol 
-  "ensembl_gene_id"), # I.e. Gene symbol as reported in HGCN
-      filters = "uniprotswissprot",
-      values = input_data_nodes$UniprotKB,
-      mart = ensembl.con) %>% 
-  mutate(dup = duplicated(uniprotswissprot)) %>% # OBS! Because Ensemble have multiple IDs per protein, we choose to only keep one
-  filter(dup != T) %>% 
-  dplyr::select(-dup)
-
-multiple_ids2 <- getBM(attributes = c(
-  "uniprotswissprot", # Uniprot ID, from the Swiss-Prot data base
-  "hgnc_id",
-  "hgnc_symbol"), # I.e. Gene symbol as reported in HGCN
-      filters = "uniprotswissprot",
-      values = input_data_nodes$UniprotKB,
-      mart = ensembl.con) %>% 
+multiple_ids1 <- getBM(
+  attributes = c(
+    "uniprotswissprot",
+    "entrezgene_id", 
+    "external_gene_name",
+    "ensembl_gene_id"
+    ), 
+  filters = "uniprotswissprot",
+  values = input_data_nodes$UniprotKB,
+  mart = ensembl.con) %>% 
   mutate(dup = duplicated(uniprotswissprot)) %>% # OBS! Because Ensemble have multiple IDs per protein, we choose to only keep one
   filter(dup != T) %>% 
   dplyr::select(-dup)
 
 
-multiple_ids <- left_join(multiple_ids1, multiple_ids2, by=c("uniprotswissprot" = "uniprotswissprot"))
+multiple_ids2 <- getBM(
+  attributes = c(
+    "uniprotswissprot", # Uniprot ID, from the Swiss-Prot data base
+    "hgnc_id",
+    "hgnc_symbol"), # I.e. Gene symbol as reported in HGCN
+  filters = "uniprotswissprot",
+  values = input_data_nodes$UniprotKB,
+  mart = ensembl.con) %>% 
+  mutate(dup = duplicated(uniprotswissprot)) %>% # OBS! Because Ensemble have multiple IDs per protein, we choose to only keep one
+  filter(dup != T) %>% 
+  dplyr::select(-dup)
+
+
+multiple_ids <- left_join(multiple_ids1, multiple_ids2, 
+                          by=c("uniprotswissprot" = "uniprotswissprot"))
+
+# Tidy up:
+rm(multiple_ids1, multiple_ids2)
+
 
 # Creates a data frame with all the synonyms:
 # Each synonym has its own row, meaning that there are multiple rows
 # with the same id/value in the "uniprotswissprot" column.
-raw_gene_syn_df <- getBM(attributes = c(
-  "uniprotswissprot", # Uniprot ID, from the Swiss-Prot data base
-  "external_synonym"), # I.e. gene synonyms
+raw_gene_syn_df <- getBM(
+  attributes = c(
+    "uniprotswissprot", # Uniprot ID, from the Swiss-Prot data base
+    "external_synonym"), # I.e. gene synonyms
   filters = "uniprotswissprot",
   values = input_data_nodes$UniprotKB,
   mart = ensembl.con)
@@ -354,97 +370,321 @@ Uniprot_IDs <- input_data_nodes %>%
   dplyr::select(UniprotKB) %>% 
   pull() # Results in character vector
 
-# Subset of swiss_prot df, with only IDs equal to those in our input data:
-sub_df <- swiss_prot %>% .[.$Entry %in% Uniprot_IDs, ]
 
-# Create new columns:
-sub_df$protein_name <- NA
-sub_df$protein_synonyms_swiss <- NA
-sub_df$gene_synonyms_swiss <- NA
 
-# Filling the new columns with protein name and synonyms:
-for (row in 1:nrow(sub_df)) { # Iterate through all the rows
-  # Find the cell containing the preferred protein name, and synonyms:
-  string <- sub_df[row,] %>% 
-    dplyr::select(Protein.names) %>% # Focus on only the Protein.names column
-    pull() # Results in a string
-  
-  # Take the string and cuts out the preferred protein name:
-  p_name <- string %>% # Take the string
-    str_sub(
-      1, # First character 
-      str_locate(., pattern = " \\(")[1] # Ends at first " ("
-    ) 
-  
-  # Take the string not containing the preferred protein name,
-  # cut it up into the synonyms, which are covered with "( )",
-  # remove the parentheses, and return a character vector:
-  syn <- string %>% 
-    str_sub(
-      str_locate(., pattern = "\\(")[1]+1, # starts after the first "("
-      nchar(string) # Ends at end of string
-    ) %>% 
-    str_replace_all(., pattern = "\\)", replacement = "") %>% # Replace ")"
-    str_split(., pattern = " \\(") %>% unlist()
-  
-  # Remove possible EC-number from the synonyms: 
-  if (!is.na(syn[1])) {
-    flag <- numeric(0) # Vector to hold index values
-    for (i in 1:length(syn)) { # Iterate over all elements of "syn" vector
-      if (str_starts(syn[i], "EC")) { # If element starts with "EC"
-        flag <- base::append(flag, i) # Append index value for the element, to flag 
-      }
-    }
+##########
+# The strings may contain information about what the result of
+# protein cleavage is. This function ditermine what should be done
+# with that information:
+cleavage_info <- function(string, remove_or_extract) {
+  if (str_detect(string, "\\[Cleaved into: ")) {
+    ind_start <- str_locate(string, "\\[Cleaved into: ")[1]
+    ind_end <- str_locate(string, "\\]")[2]
     
-    # Checks if any elements of "syn" started with "EC" (i.e. is length of flag > 0)
-    if (length(flag > 0)) {
-      syn <- syn[-c(flag)] # Removes the element with index values in flag
+    
+    string_first <- str_sub(string, end = ind_start-1)
+    string_end <- str_sub(string, start = ind_end+1)
+    
+    if (remove_or_extract == "remove") {
+      string <- str_c(string_first, string_end) %>% str_squish()
+      return(string)
+    } else if (remove_or_extract == "extract") {
+      string <- str_sub(string, ind_start, ind_end) %>% str_squish()
+      return(string)
     }
   }
   
-  # Remove possible NAs that have been included:
-  syn <- syn[!is.na(syn)]
-  
-  # Collapse the synonyms with the "|" between:
-  syn <- paste0(syn, collapse = "|")
-  
-  # Take the entry name (e.g. TNFA_HUMAN) and remove "_HUMAN" 
-  ent_name <- sub_df[row, "Entry.Name"] %>% 
-    str_replace(pattern = "_HUMAN", replacement = "")
-  
-  # Add the entry name to the other synonyms:
-  # There may not be any synonyms in the data base, and then we only
-  # ad the entry name:
-  if (syn != "") {
-    syn <- str_c(ent_name, syn, sep = "|")
+  if (remove_or_extract == "remove") {
+    return(string)
   } else {
-    syn <- ent_name
+    return("")
   }
-  
-  # Use the custom function to collapse the gene name and all its synonyms
-  # together in a single string:
-  g_syn <- col_splice_to_string(df = sub_df,
-              row = row,
-              col1 = "Gene.Names", 
-              col2 = "Gene.Names..synonym.",
-              from_sep = " ", 
-              to_sep = "|")
-  
-  
-  # Assign the values to the respective columns
-  sub_df[row, "protein_name"] <- p_name
-  sub_df[row, "protein_synonyms_swiss"] <- syn
-  sub_df[row, "gene_synonyms_swiss"] <- g_syn
-  
 }
 
+
+
+# Convert from "name1 (name2) (name3)" to "name1|name2|name3":
+str_change_sep <- function(string) {
+  # Checks if sting include a left parenthesis, which would
+  # mean that the string consists of multiple terms:
+  if (str_detect(string, "\\(")) {
+    # Checks if string includes ") (", which would mean that
+    # the string consists of at least 3 terms:
+    if (str_detect(string, "\\) \\(")) {
+      string <- string %>% 
+        str_replace_all( # Replace ") (" with "|"
+          pattern = "\\) \\(",
+          replacement = "|") 
+    }
+    
+    # If only 2 terms in string, or after the ") (" are replaced
+    # in the previous IF-statement:
+    string <- string %>% 
+      str_replace( # Replace the " (" with "|"
+        pattern = " \\(",
+        replacement = "|") 
+    
+    # The only thing missing is the last parenthesis, if present:
+    if (str_ends(string, "\\)")) {
+      string <- str_sub(string, end = -2)
+    }
+  }
+  
+  # Return the string:
+  # If the string only consisted of a single term, all the if-else statements
+  # would have been skipped, and the string is unaltered.
+  return(string)
+}
+
+
+
+# Function to remove duplicates in a string:
+str_rm_duplicates <- function(string, sep, collapse) {
+  # Handle situations where there is only a single term, or 
+  # the "string" is NA:
+  if (is.na(string)) {
+    return("")
+  } else if (sep == "|" && str_detect(string, "\\|") == F) {
+    return(string)
+  } else if (sep != "|" && str_detect(string, sep) == F) {
+    return(string)
+  }
+  
+  
+  if (sep == "|") {
+    sep_bar <- T
+  } else {
+    sep_bar <- F
+  }
+  if (collapse == "|") {
+    col_bar <- T
+  } else {
+    col_bar <- F
+  }
+  
+  
+  if (all(sep_bar, col_bar)) {
+    string <- string %>% 
+      str_split(pattern = "\\|") %>% 
+      unlist() %>% 
+      base::unique() %>% 
+      str_c(collapse = "|")
+  } else if (any(sep_bar, col_bar)) {
+    if (sep_bar) {
+      string <- string %>% 
+        str_split(pattern = "\\|") %>% 
+        unlist() %>% 
+        base::unique() %>% 
+        str_c(collapse = "|")
+    } else {
+      string <- string %>% 
+        str_split(pattern = sep) %>% 
+        unlist() %>% 
+        base::unique() %>% 
+        str_c(collapse = "|")
+    }
+  } else {
+    string <- string %>% 
+      str_split(pattern = sep) %>% 
+      unlist() %>% 
+      base::unique() %>% 
+      str_c(collapse = collapse)
+  }
+  
+  return(string)
+}
+
+
+# Vectorize the function:
+str_rm_duplicates_vec <- Vectorize(str_rm_duplicates, "string")
+
+
+
+# Function to remove the EC-number which may be part of the string:
+str_rm_ECnumber <- function(string) {
+  string <- string %>% 
+    str_split(pattern = "\\|") %>% # Splits the string at "|", into list
+    unlist()
+  
+  # Does at least one element starts with "EC "?:
+  if (any(str_detect(string, "EC "))) {
+    index <- str_which(string, pattern = "EC ") # Locate the elements
+    
+    string <- string[-index] # Removes by index values
+  }
+  
+  string <- str_c(string, collapse = "|") # Collapse vector to string
+  return(string)
+}
+
+
+# Subset of swiss_prot df, with only IDs equal to those in our input data:
+sub_df <- swiss_prot %>% 
+  filter(Entry %in% Uniprot_IDs) %>% 
+  group_by(Entry) %>% 
+  mutate( # Change the content of columns:
+    # Extract the cleavage information:
+    Cleaved = cleavage_info(Protein.names, "extract"),
+    # Remove the clevage information from the column Protein.names:
+    Protein.names = cleavage_info(
+      Protein.names,
+      remove_or_extract = "remove"),
+    # Change the separator of terms in the column Protein.names:
+    Protein.names = str_change_sep(Protein.names),
+    # Remove the EC-numbers in the column Protein.names:
+    Protein.names = str_rm_ECnumber(Protein.names),
+    # Construct a new column with only the first term from Protein.names:
+    Protein_name =
+      ifelse(
+        str_detect(Protein.names, "\\|"),
+        str_sub(
+          Protein.names,
+          end = str_locate(Protein.names, "\\|")[1]-1
+        ),
+        Protein.names
+      ),
+    # Protein_name =
+    #   str_get_protName(
+    #     Protein.names # Input values from this column
+    #     ),
+    # Construct a new column with only synonyms, if any, meaning that
+    # the protein name is excluded:
+    Protein_synonyms =
+      ifelse(
+        str_detect(Protein.names, "\\|"), # IF statement
+        str_sub(Protein.names, # True; cell = only protein synonyms (i.e. without protein name)
+                start = str_locate(
+                  Protein.names,
+                  pattern = "\\|")[1]+1),
+        ""), # False; cell = empty (i.e. no protein synonyms)
+    # Add the Entry name as a synonym:
+    Protein_synonyms = str_c(Entry.Name, Protein_synonyms, sep="|"),
+    # Remove posible "|" at end of string:
+    Protein_synonyms = ifelse(str_ends(Protein_synonyms,
+                                       pattern = "\\|"),
+                              str_sub(Protein_synonyms, end = -2),
+                              Protein_synonyms),
+    # Construct a new column of gene synonyms from the columns Gene.Names 
+    # and Gene.Names..synonym.:
+    Gene_synonyms = str_c(Gene.Names, Gene.Names..synonym.,
+                          sep = " "),
+    # Remove duplicated synonyms:
+    Gene_synonyms = str_rm_duplicates(Gene_synonyms, 
+                                      sep = " ",
+                                      collapse = "|"),
+    # Remove posible "|" at end of string:
+    Gene_synonyms = ifelse(str_ends(Gene_synonyms,
+                                    pattern = "\\|"),
+                           str_sub(Gene_synonyms, end = -2),
+                           Gene_synonyms)
+  ) %>% 
+  dplyr::select(Entry, 
+                "protein_name"=Protein_name, 
+                "protein_synonyms_swiss"=Protein_synonyms, 
+                Cleaved, 
+                "gene_synonyms_swiss"=Gene_synonyms)
+
+
+#########
+
+
+######
+# # Subset of swiss_prot df, with only IDs equal to those in our input data:
+# #sub_df <- swiss_prot %>% .[.$Entry %in% Uniprot_IDs, ]
+# 
+# sub_df <- swiss_prot %>% 
+#   filter(Entry %in% Uniprot_IDs)
+# 
+# 
+# # Create new columns:
+# sub_df$protein_name <- NA
+# sub_df$protein_synonyms_swiss <- NA
+# sub_df$gene_synonyms_swiss <- NA
+# 
+# # Filling the new columns with protein name and synonyms:
+# for (row in 1:nrow(sub_df)) { # Iterate through all the rows
+#   # Find the cell containing the preferred protein name, and synonyms:
+#   string <- sub_df[row,] %>% 
+#     dplyr::select(Protein.names) %>% # Focus on only the Protein.names column
+#     pull() # Results in a string
+#   
+#   # Take the string and cuts out the preferred protein name:
+#   p_name <- string %>% # Take the string
+#     str_sub(
+#       1, # First character 
+#       str_locate(., pattern = " \\(")[1] # Ends at first " ("
+#     ) 
+#   
+#   # Take the string not containing the preferred protein name,
+#   # cut it up into the synonyms, which are covered with "( )",
+#   # remove the parentheses, and return a character vector:
+#   syn <- string %>% 
+#     str_sub(
+#       str_locate(., pattern = "\\(")[1]+1, # starts after the first "("
+#       nchar(string) # Ends at end of string
+#     ) %>% 
+#     str_replace_all(., pattern = "\\)", replacement = "") %>% # Replace ")"
+#     str_split(., pattern = " \\(") %>% unlist()
+#   
+#   # Remove possible EC-number from the synonyms: 
+#   if (!is.na(syn[1])) {
+#     flag <- numeric(0) # Vector to hold index values
+#     for (i in 1:length(syn)) { # Iterate over all elements of "syn" vector
+#       if (str_starts(syn[i], "EC")) { # If element starts with "EC"
+#         flag <- base::append(flag, i) # Append index value for the element, to flag 
+#       }
+#     }
+#     
+#     # Checks if any elements of "syn" started with "EC" (i.e. is length of flag > 0)
+#     if (length(flag > 0)) {
+#       syn <- syn[-c(flag)] # Removes the element with index values in flag
+#     }
+#   }
+#   
+#   # Remove possible NAs that have been included:
+#   syn <- syn[!is.na(syn)]
+#   
+#   # Collapse the synonyms with the "|" between:
+#   syn <- paste0(syn, collapse = "|")
+#   
+#   # Take the entry name (e.g. TNFA_HUMAN) and remove "_HUMAN" 
+#   ent_name <- sub_df[row, "Entry.Name"] %>% 
+#     str_replace(pattern = "_HUMAN", replacement = "")
+#   
+#   # Add the entry name to the other synonyms:
+#   # There may not be any synonyms in the data base, and then we only
+#   # ad the entry name:
+#   if (syn != "") {
+#     syn <- str_c(ent_name, syn, sep = "|")
+#   } else {
+#     syn <- ent_name
+#   }
+#   
+#   # Use the custom function to collapse the gene name and all its synonyms
+#   # together in a single string:
+#   g_syn <- col_splice_to_string(df = sub_df,
+#               row = row,
+#               col1 = "Gene.Names", 
+#               col2 = "Gene.Names..synonym.",
+#               from_sep = " ", 
+#               to_sep = "|")
+#   
+#   
+#   # Assign the values to the respective columns
+#   sub_df[row, "protein_name"] <- p_name
+#   sub_df[row, "protein_synonyms_swiss"] <- syn
+#   sub_df[row, "gene_synonyms_swiss"] <- g_syn
+#   
+# }
+#####
 
 # Create a new data frame with only the interesting to us:
 Swiss_df <- sub_df %>% 
   dplyr::select(Entry, 
                 protein_name, 
                 protein_synonyms_swiss,
-                gene_synonyms_swiss)
+                gene_synonyms_swiss,
+                Cleaved)
 
 
 ## Tidy up:
@@ -469,21 +709,40 @@ merge_df <- input_data_nodes %>%
             by=c("UniprotKB" = "Entry"))
 
 
+
+merge_df <- merge_df %>% 
+  mutate(final_gene_syn = 
+           str_c(gene_synonyms_BioMart, 
+                 gene_synonyms_swiss,
+                 sep = "|"),
+         final_gene_syn = ifelse(
+           str_starts(final_gene_syn, "\\|"),
+           str_sub(final_gene_syn, 2),
+           ifelse(
+             str_ends(final_gene_syn, "\\|"),
+             str_sub(final_gene_syn, -2),
+             final_gene_syn
+           )
+         ),
+         final_gene_syn = 
+           str_rm_duplicates_vec(final_gene_syn,
+                             sep = "|",
+                             collapse = "|"))
 # Create a new column for the final version of gene synonyms,
 # and fill it with the function col_splice_to_string():
-merge_df$final_gene_syn <- NA
-for (i in 1:nrow(merge_df)) {
-  if (merge_df[i, "UniprotKB"] != "") {
-    merge_df[i, "final_gene_syn"] <- col_splice_to_string(
-      df = merge_df,
-      row = i,
-      col1 = "gene_synonyms_BioMart",
-      col2 = "gene_synonyms_swiss",
-      from_sep = "|",
-      to_sep = "|"
-    )
-  }
-}
+# merge_df$final_gene_syn <- NA
+# for (i in 1:nrow(merge_df)) {
+#   if (merge_df[i, "UniprotKB"] != "") {
+#     merge_df[i, "final_gene_syn"] <- col_splice_to_string(
+#       df = merge_df,
+#       row = i,
+#       col1 = "gene_synonyms_BioMart",
+#       col2 = "gene_synonyms_swiss",
+#       from_sep = "|",
+#       to_sep = "|"
+#     )
+#   }
+# }
 
 
 
@@ -702,5 +961,5 @@ newest_edges <- bind_rows(newest_edges, df) %>%
   distinct(.keep_all = T)
 
 
-write.csv(newest_nodes, str_c(getwd(), "/new_nodes.csv"), row.names = F)
-write.csv(newest_edges, str_c(getwd(), "/new_edges.csv"), row.names = F)
+#write.csv(newest_nodes, str_c(getwd(), "/new_nodes.csv"), row.names = F)
+#write.csv(newest_edges, str_c(getwd(), "/new_edges.csv"), row.names = F)
