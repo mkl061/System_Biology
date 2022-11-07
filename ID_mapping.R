@@ -63,19 +63,31 @@ if (Sys.info()["nodename"] == "MARIUSPC") {
 
 
 
-# Fucntion that looks throught all characther columns, and removes
+# Function that looks through all character columns, and removes
 # white spaces at front and end, and convert multiple spaces to single spaces:
-remove_whitespaces <- function(df) {
-  for (col in 1:ncol(df)) {
-    if (is.character(df[,col])) { # Checks if column is of character type
-      df[,col] <- sapply(
-        df[,col],
-        str_squish) # Removes white spaces in front, back and reduce multiple spaces to a single one
-    }
-  }
-  return(df)
-}
+# remove_whitespaces <- function(df) {
+#   for (col in 1:ncol(df)) {
+#     if (is.character(df[,col])) { # Checks if column is of character type
+#       df[,col] <- sapply(
+#         df[,col],
+#         str_squish) # Removes white spaces in front, back and reduce multiple spaces to a single one
+#     }
+#   }
+#   return(df)
+# }
 
+
+remove_whitespaces <- function(df) {
+  df <- df %>% 
+    mutate( # Change column values
+      across( # All columns which ...
+        where(is.character), # ... are of type character/string
+        str_squish # Apply this function. Which removes whitespaces
+      )
+    )
+  
+  return(df) # Return the data frame
+}
 
 
 # Function to reverse all elements in a character column:
@@ -220,11 +232,14 @@ file <- files[mtimes][length(files)]
 
 input_data_nodes <- read_excel(file, sheet = "nodes")
 
-input_data_nodes$Common_name <- input_data_nodes$Common_name %>% str_replace("\xa0", "") # Fixing a reocurring problem
+#input_data_nodes$Common_name <- input_data_nodes$Common_name %>% str_replace("\xa0", "") # Fixing a reocurring problem
 
 # Tidy up the file by removing unwanted white spaces:
 input_data_nodes <- remove_whitespaces(input_data_nodes)
 
+# Fix capital letter in name:
+input_data_nodes <- input_data_nodes %>% 
+  mutate(Curator = str_to_title(Curator))
 
 
 ## Edges:
@@ -281,7 +296,9 @@ multiple_ids2 <- getBM(attributes = c(
   dplyr::select(-dup)
 
 
-multiple_ids <- left_join(multiple_ids1, multiple_ids2, by=c("uniprotswissprot" = "uniprotswissprot"))
+multiple_ids <- left_join(multiple_ids1, 
+                          multiple_ids2, 
+                          by=c("uniprotswissprot" = "uniprotswissprot"))
 
 # Creates a data frame with all the synonyms:
 # Each synonym has its own row, meaning that there are multiple rows
@@ -293,44 +310,50 @@ raw_gene_syn_df <- getBM(attributes = c(
   values = input_data_nodes$UniprotKB,
   mart = ensembl.con)
 
-# Takes the raw_gene_syn_df, and combine all the synonym for every Uniprot ID
-# to a single row:
-# "fin_gene_syn_df stands for "finished gene synonym data frame"
-fin_gene_syn_df <- input_data_nodes %>% 
-  dplyr::select(UniprotKB) # Uniprot IDs from input data
+fin_gene_syn_df <- raw_gene_syn_df %>% 
+  group_by(uniprotswissprot) %>% 
+  summarise(gene_synonyms = paste0(external_synonym, collapse = "|")) %>% 
+  filter(uniprotswissprot %in% input_data_nodes$UniprotKB)
 
-fin_gene_syn_df$gene_synonyms_BioMart <- NA # Create a new column
-
-for (U_ID in fin_gene_syn_df$UniprotKB) { # Iterate trough all Uniprot IDs
-  vec <- raw_gene_syn_df %>% # Get raw data
-    filter(uniprotswissprot == U_ID) %>% # Filter to only rows with current Uniprot ID
-    dplyr::select(external_synonym) %>% # Select only synonym column
-    pull() %>% # Converts data frame column to character vector 
-    paste0(collapse = "|") # Collapse all elements of vector to single string
-  
-  # Assigns the string as the cell-content of the column (i.e. gene synonym)
-  # and the row (i.e. the one with column UniprotKB == the Uniprot ID):
-  fin_gene_syn_df$gene_synonyms_BioMart[fin_gene_syn_df$UniprotKB == U_ID] <- vec
-}
-
-# Remove rows with empty Uniprot ID:
-fin_gene_syn_df <- fin_gene_syn_df %>% 
-  filter(UniprotKB != "") 
+# # Takes the raw_gene_syn_df, and combine all the synonym for every Uniprot ID
+# # to a single row:
+# # "fin_gene_syn_df stands for "finished gene synonym data frame"
+# fin_gene_syn_df <- input_data_nodes %>% 
+#   dplyr::select(UniprotKB) # Uniprot IDs from input data
+# 
+# fin_gene_syn_df$gene_synonyms_BioMart <- NA # Create a new column
+# 
+# for (U_ID in fin_gene_syn_df$UniprotKB) { # Iterate trough all Uniprot IDs
+#   vec <- raw_gene_syn_df %>% # Get raw data
+#     filter(uniprotswissprot == U_ID) %>% # Filter to only rows with current Uniprot ID
+#     dplyr::select(external_synonym) %>% # Select only synonym column
+#     pull() %>% # Converts data frame column to character vector 
+#     paste0(collapse = "|") # Collapse all elements of vector to single string
+#   
+#   # Assigns the string as the cell-content of the column (i.e. gene synonym)
+#   # and the row (i.e. the one with column UniprotKB == the Uniprot ID):
+#   fin_gene_syn_df$gene_synonyms_BioMart[fin_gene_syn_df$UniprotKB == U_ID] <- vec
+# }
+# 
+# # Remove rows with empty Uniprot ID:
+# fin_gene_syn_df <- fin_gene_syn_df %>% 
+#   filter(UniprotKB != "") 
 
 # Combine the data frame with different IDs with the the data frame
 # with all the gene synonyms:
 BioMart_df <- left_join(
   multiple_ids, fin_gene_syn_df, 
-  by=c("uniprotswissprot" = "UniprotKB"))
+  by=c("uniprotswissprot" = "uniprotswissprot"))
 
 
 ## Tidying up:
-rm(multiple_ids, 
+rm(multiple_ids,
+   multiple_ids1,
+   multiple_ids2,
    raw_gene_syn_df, 
-   fin_gene_syn_df,
-   U_ID,
-   vec
+   fin_gene_syn_df
    )
+
 
 
 
@@ -477,7 +500,7 @@ for (i in 1:nrow(merge_df)) {
     merge_df[i, "final_gene_syn"] <- col_splice_to_string(
       df = merge_df,
       row = i,
-      col1 = "gene_synonyms_BioMart",
+      col1 = "gene_synonyms",
       col2 = "gene_synonyms_swiss",
       from_sep = "|",
       to_sep = "|"
