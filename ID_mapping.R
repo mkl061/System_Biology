@@ -333,32 +333,8 @@ fin_gene_syn_df <- raw_gene_syn_df %>%
   group_by(uniprotswissprot) %>% 
   summarise(gene_synonyms_BioMart = 
               paste0(external_synonym, 
-                     collapse = "|")) #%>% 
-  #filter(uniprotswissprot %in% input_data_nodes$UniprotKB)
+                     collapse = "|"))
 
-# # Takes the raw_gene_syn_df, and combine all the synonym for every Uniprot ID
-# # to a single row:
-# # "fin_gene_syn_df stands for "finished gene synonym data frame"
-# fin_gene_syn_df <- input_data_nodes %>% 
-#   dplyr::select(UniprotKB) # Uniprot IDs from input data
-# 
-# fin_gene_syn_df$gene_synonyms_BioMart <- NA # Create a new column
-# 
-# for (U_ID in fin_gene_syn_df$UniprotKB) { # Iterate trough all Uniprot IDs
-#   vec <- raw_gene_syn_df %>% # Get raw data
-#     filter(uniprotswissprot == U_ID) %>% # Filter to only rows with current Uniprot ID
-#     dplyr::select(external_synonym) %>% # Select only synonym column
-#     pull() %>% # Converts data frame column to character vector 
-#     paste0(collapse = "|") # Collapse all elements of vector to single string
-#   
-#   # Assigns the string as the cell-content of the column (i.e. gene synonym)
-#   # and the row (i.e. the one with column UniprotKB == the Uniprot ID):
-#   fin_gene_syn_df$gene_synonyms_BioMart[fin_gene_syn_df$UniprotKB == U_ID] <- vec
-# }
-# 
-# # Remove rows with empty Uniprot ID:
-# fin_gene_syn_df <- fin_gene_syn_df %>% 
-#   filter(UniprotKB != "") 
 
 # Combine the data frame with different IDs with the the data frame
 # with all the gene synonyms:
@@ -607,105 +583,6 @@ Swiss_df <- swiss_prot %>%
 
 
 
-
-
-######
-# # Subset of swiss_prot df, with only IDs equal to those in our input data:
-# #sub_df <- swiss_prot %>% .[.$Entry %in% Uniprot_IDs, ]
-# 
-# sub_df <- swiss_prot %>% 
-#   filter(Entry %in% Uniprot_IDs)
-# 
-# 
-# # Create new columns:
-# sub_df$protein_name <- NA
-# sub_df$protein_synonyms_swiss <- NA
-# sub_df$gene_synonyms_swiss <- NA
-# 
-# # Filling the new columns with protein name and synonyms:
-# for (row in 1:nrow(sub_df)) { # Iterate through all the rows
-#   # Find the cell containing the preferred protein name, and synonyms:
-#   string <- sub_df[row,] %>% 
-#     dplyr::select(Protein.names) %>% # Focus on only the Protein.names column
-#     pull() # Results in a string
-#   
-#   # Take the string and cuts out the preferred protein name:
-#   p_name <- string %>% # Take the string
-#     str_sub(
-#       1, # First character 
-#       str_locate(., pattern = " \\(")[1] # Ends at first " ("
-#     ) 
-#   
-#   # Take the string not containing the preferred protein name,
-#   # cut it up into the synonyms, which are covered with "( )",
-#   # remove the parentheses, and return a character vector:
-#   syn <- string %>% 
-#     str_sub(
-#       str_locate(., pattern = "\\(")[1]+1, # starts after the first "("
-#       nchar(string) # Ends at end of string
-#     ) %>% 
-#     str_replace_all(., pattern = "\\)", replacement = "") %>% # Replace ")"
-#     str_split(., pattern = " \\(") %>% unlist()
-#   
-#   # Remove possible EC-number from the synonyms: 
-#   if (!is.na(syn[1])) {
-#     flag <- numeric(0) # Vector to hold index values
-#     for (i in 1:length(syn)) { # Iterate over all elements of "syn" vector
-#       if (str_starts(syn[i], "EC")) { # If element starts with "EC"
-#         flag <- base::append(flag, i) # Append index value for the element, to flag 
-#       }
-#     }
-#     
-#     # Checks if any elements of "syn" started with "EC" (i.e. is length of flag > 0)
-#     if (length(flag > 0)) {
-#       syn <- syn[-c(flag)] # Removes the element with index values in flag
-#     }
-#   }
-#   
-#   # Remove possible NAs that have been included:
-#   syn <- syn[!is.na(syn)]
-#   
-#   # Collapse the synonyms with the "|" between:
-#   syn <- paste0(syn, collapse = "|")
-#   
-#   # Take the entry name (e.g. TNFA_HUMAN) and remove "_HUMAN" 
-#   ent_name <- sub_df[row, "Entry.Name"] %>% 
-#     str_replace(pattern = "_HUMAN", replacement = "")
-#   
-#   # Add the entry name to the other synonyms:
-#   # There may not be any synonyms in the data base, and then we only
-#   # ad the entry name:
-#   if (syn != "") {
-#     syn <- str_c(ent_name, syn, sep = "|")
-#   } else {
-#     syn <- ent_name
-#   }
-#   
-#   # Use the custom function to collapse the gene name and all its synonyms
-#   # together in a single string:
-#   g_syn <- col_splice_to_string(df = sub_df,
-#               row = row,
-#               col1 = "Gene.Names", 
-#               col2 = "Gene.Names..synonym.",
-#               from_sep = " ", 
-#               to_sep = "|")
-#   
-#   
-#   # Assign the values to the respective columns
-#   sub_df[row, "protein_name"] <- p_name
-#   sub_df[row, "protein_synonyms_swiss"] <- syn
-#   sub_df[row, "gene_synonyms_swiss"] <- g_syn
-#   
-# }
-#####
-
-# Create a new data frame with only the interesting to us:
-# Swiss_df <- sub_df %>% 
-#   dplyr::select(Entry, 
-#                 protein_name, 
-#                 protein_synonyms_swiss,
-#                 gene_synonyms_swiss,
-#                 Cleaved)
 
 
 
@@ -958,5 +835,5 @@ newest_edges <- bind_rows(newest_edges, df) %>%
   distinct(.keep_all = T)
 
 
-#write.csv(newest_nodes, str_c(getwd(), "/new_nodes.csv"), row.names = F)
-#write.csv(newest_edges, str_c(getwd(), "/new_edges.csv"), row.names = F)
+write.csv(newest_nodes, str_c(getwd(), "/new_nodes.csv"), row.names = F)
+write.csv(newest_edges, str_c(getwd(), "/new_edges.csv"), row.names = F)
