@@ -40,8 +40,14 @@ remove_whitespaces <- function(df) {
 # Set working directory:
 #setwd("C:/Users/Legion/Downloads") # Working directory. Change to your directory of choice (e.g. Downloads)
 # NB! Short cut for setting working directory: Ctrl+Shift+H or Cmd+Shift+H
-if (Sys.info()["nodename"] == "MARIUSPC") {
+if (Sys.info()["nodename"] == "MARIUSPC") { # Marius 1
   setwd("C:/Users/Legion/Downloads")
+} else if (Sys.info()["nodename"] == "penguin") { # Marius 2
+  setwd("/mnt/chromeos/MyFiles/Downloads")
+} else if (Sys.info()["nodename"] == "dhcp-10-22-28-162.wlan.ntnu.no") { # Jann
+  setwd("~/Desktop/run everything")
+} else if (Sys.info()["nodename"] == "LAPTOP-3BEG4HPK") { # Vibeke
+  setwd("C:/Users/Vibeke/Downloads")
 }
 
 
