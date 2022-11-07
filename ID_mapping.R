@@ -233,10 +233,6 @@ file <- files[mtimes][length(files)]
 input_data_nodes <- read_excel(file, sheet = "nodes")
 
 #input_data_nodes$Common_name <- input_data_nodes$Common_name %>% str_replace("\xa0", "") # Fixing a reocurring problem
-<<<<<<< HEAD
-=======
-
->>>>>>> 0a3a898fb709174836d05fd30a2a7c3a52633025
 
 # Tidy up the file by removing unwanted white spaces:
 input_data_nodes <- remove_whitespaces(input_data_nodes)
@@ -296,11 +292,6 @@ multiple_ids1 <- getBM(
   dplyr::select(-dup)
 
 
-<<<<<<< HEAD
-multiple_ids <- left_join(multiple_ids1, 
-                          multiple_ids2, 
-                          by=c("uniprotswissprot" = "uniprotswissprot"))
-=======
 multiple_ids2 <- getBM(
   attributes = c(
     "uniprotswissprot", # Uniprot ID, from the Swiss-Prot data base
@@ -320,7 +311,6 @@ multiple_ids <- left_join(multiple_ids1, multiple_ids2,
 # Tidy up:
 rm(multiple_ids1, multiple_ids2)
 
->>>>>>> 0a3a898fb709174836d05fd30a2a7c3a52633025
 
 # Creates a data frame with all the synonyms:
 # Each synonym has its own row, meaning that there are multiple rows
@@ -760,21 +750,7 @@ merge_df <- merge_df %>%
                              collapse = "|"))
 # Create a new column for the final version of gene synonyms,
 # and fill it with the function col_splice_to_string():
-<<<<<<< HEAD
-merge_df$final_gene_syn <- NA
-for (i in 1:nrow(merge_df)) {
-  if (merge_df[i, "UniprotKB"] != "") {
-    merge_df[i, "final_gene_syn"] <- col_splice_to_string(
-      df = merge_df,
-      row = i,
-      col1 = "gene_synonyms",
-      col2 = "gene_synonyms_swiss",
-      from_sep = "|",
-      to_sep = "|"
-    )
-  }
-}
-=======
+
 # merge_df$final_gene_syn <- NA
 # for (i in 1:nrow(merge_df)) {
 #   if (merge_df[i, "UniprotKB"] != "") {
@@ -788,7 +764,7 @@ for (i in 1:nrow(merge_df)) {
 #     )
 #   }
 # }
->>>>>>> 0a3a898fb709174836d05fd30a2a7c3a52633025
+
 
 
 
