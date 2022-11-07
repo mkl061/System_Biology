@@ -63,8 +63,7 @@ if (Sys.info()["nodename"] == "MARIUSPC") { # Marius 1
 
 
 
-# Function that looks through all character columns, and removes
-# white spaces at front and end, and convert multiple spaces to single spaces:
+
 # remove_whitespaces <- function(df) {
 #   for (col in 1:ncol(df)) {
 #     if (is.character(df[,col])) { # Checks if column is of character type
@@ -77,6 +76,8 @@ if (Sys.info()["nodename"] == "MARIUSPC") { # Marius 1
 # }
 
 
+# Function that looks through all character columns, and removes white 
+# spaces at front and end, and convert multiple spaces to single spaces:
 remove_whitespaces <- function(df) {
   df <- df %>% 
     mutate( # Change column values
@@ -88,6 +89,7 @@ remove_whitespaces <- function(df) {
   
   return(df) # Return the data frame
 }
+
 
 
 # Function to reverse all elements in a character column:
@@ -105,99 +107,99 @@ str_rev_in_vec <- function(vec) {
 
 # Function to collapse strings of two different columns (same row) with
 # specified separator:
-col_splice_to_string <- function(df, row, col1, col2, from_sep, to_sep) {
-  first <- df[row, col1] 
-  second <- df[row, col2] 
-  
-  first_NA <- is.na(first)
-  second_NA <- is.na(second)
-  
-  if (first_NA == F && second_NA == F) { # None are NA
-    # None of the variables are equal to NA.
-    # However, they may be equal to "" (i.e. they may be empty strings)
-    
-    # Create variables, holding either TRUE or FALSE, depending on
-    # if the input variables are equal to "" or not:
-    first_empty <- first == ""
-    second_empty <- second == ""
-    
-    if (first_empty == F && second_empty == F) { # None are empty (i.e. "")
-      # None of them are empty, then we can proceed to combining them:
-      final <- str_flatten(c(first, second), collapse = from_sep)
-      # Check if "|" is used as separator. If so, given that "|" is
-      # a special character, we need to putt "\\" in front:
-      if (from_sep == "|") {
-        final <- final %>% str_split(pattern = "\\|") # splits (at "|") into list of vectors
-      } else { # The separator is something else:
-        final <- final %>% str_split(pattern = from_sep) # splits (at from_sep) into list of vectors
-      }
-      final <- final %>%
-        base::unlist() %>% # Unlist to get the single vector
-        base::unique() %>% # Keep only the unique elements of the vector
-        str_flatten(collapse = to_sep) # Flattens the vector to a single string, with each element separated by the to_sep
-      
-      return(final) # Return the string
-    } else if (first_empty == T && second_empty == T) {
-      return(NA)
-    } else if (first_empty == T) { # First is empty, but not Second
-      return(second)
-    } else { # Second is empty, but first is not
-      return(first)
-    }
-    
-    
-  } else if (first_NA == T && second_NA == T) { # Both are NA
-    return(NA)
-  } else if (first_NA == T) { # First is NA, Second is not
-    if (second == "") { # Checks if Second could be empty
-      return(NA) # If so, return NA
-    } else { 
-      # Second is neither NA nor "", but we need to check if it 
-      # consists of multiple terms or not:
-      if (str_detect(str_squish(second), from_sep) == F) { # Is from_sep in Second
-        return(second)
-      } else { # from_sep is in Second
-        # Check if "|" is used as separator. If so, given that "|" is
-        # a special character, we need to putt "\\" in front:
-        if (from_sep == "|") {
-          second <- second %>% str_split(pattern = "\\|") # splits (at "|") into list of vectors
-        } else { # The separator is something else:
-          second <- second %>% str_split(pattern = from_sep) # splits (at from_sep) into list of vectors
-        }
-        second <- second %>%
-          base::unlist() %>% # Unlist to get the single vector
-          base::unique() %>% # Keep only the unique elements of the vector
-          str_flatten(collapse = to_sep) # Flattens the vector to a single string, with each element separated by the to_sep
-        
-        return(second) # Return the string
-      }
-    }
-  } else { # Second is NA, First is not
-    if (first == "") { # Checks if first could be empty
-      return(NA) # If so, return NA
-    } else { 
-      # first is neither NA nor "", but we need to check if it 
-      # consists of multiple terms or not:
-      if (str_detect(str_squish(first), from_sep) == F) { # Is from_sep in first
-        return(first)
-      } else { # from_sep is in first
-        # Check if "|" is used as separator. If so, given that "|" is
-        # a special character, we need to putt "\\" in front:
-        if (from_sep == "|") {
-          first <- first %>% str_split(pattern = "\\|") # splits (at "|") into list of vectors
-        } else { # The separator is something else:
-          first <- first %>% str_split(pattern = from_sep) # splits (at from_sep) into list of vectors
-        }
-        first <- first %>%
-          base::unlist() %>% # Unlist to get the single vector
-          base::unique() %>% # Keep only the unique elements of the vector
-          str_flatten(collapse = to_sep) # Flattens the vector to a single string, with each element separated by the to_sep
-        
-        return(first) # Return the string
-      }
-    }
-  }
-}
+# col_splice_to_string <- function(df, row, col1, col2, from_sep, to_sep) {
+#   first <- df[row, col1] 
+#   second <- df[row, col2] 
+#   
+#   first_NA <- is.na(first)
+#   second_NA <- is.na(second)
+#   
+#   if (first_NA == F && second_NA == F) { # None are NA
+#     # None of the variables are equal to NA.
+#     # However, they may be equal to "" (i.e. they may be empty strings)
+#     
+#     # Create variables, holding either TRUE or FALSE, depending on
+#     # if the input variables are equal to "" or not:
+#     first_empty <- first == ""
+#     second_empty <- second == ""
+#     
+#     if (first_empty == F && second_empty == F) { # None are empty (i.e. "")
+#       # None of them are empty, then we can proceed to combining them:
+#       final <- str_flatten(c(first, second), collapse = from_sep)
+#       # Check if "|" is used as separator. If so, given that "|" is
+#       # a special character, we need to putt "\\" in front:
+#       if (from_sep == "|") {
+#         final <- final %>% str_split(pattern = "\\|") # splits (at "|") into list of vectors
+#       } else { # The separator is something else:
+#         final <- final %>% str_split(pattern = from_sep) # splits (at from_sep) into list of vectors
+#       }
+#       final <- final %>%
+#         base::unlist() %>% # Unlist to get the single vector
+#         base::unique() %>% # Keep only the unique elements of the vector
+#         str_flatten(collapse = to_sep) # Flattens the vector to a single string, with each element separated by the to_sep
+#       
+#       return(final) # Return the string
+#     } else if (first_empty == T && second_empty == T) {
+#       return(NA)
+#     } else if (first_empty == T) { # First is empty, but not Second
+#       return(second)
+#     } else { # Second is empty, but first is not
+#       return(first)
+#     }
+#     
+#     
+#   } else if (first_NA == T && second_NA == T) { # Both are NA
+#     return(NA)
+#   } else if (first_NA == T) { # First is NA, Second is not
+#     if (second == "") { # Checks if Second could be empty
+#       return(NA) # If so, return NA
+#     } else { 
+#       # Second is neither NA nor "", but we need to check if it 
+#       # consists of multiple terms or not:
+#       if (str_detect(str_squish(second), from_sep) == F) { # Is from_sep in Second
+#         return(second)
+#       } else { # from_sep is in Second
+#         # Check if "|" is used as separator. If so, given that "|" is
+#         # a special character, we need to putt "\\" in front:
+#         if (from_sep == "|") {
+#           second <- second %>% str_split(pattern = "\\|") # splits (at "|") into list of vectors
+#         } else { # The separator is something else:
+#           second <- second %>% str_split(pattern = from_sep) # splits (at from_sep) into list of vectors
+#         }
+#         second <- second %>%
+#           base::unlist() %>% # Unlist to get the single vector
+#           base::unique() %>% # Keep only the unique elements of the vector
+#           str_flatten(collapse = to_sep) # Flattens the vector to a single string, with each element separated by the to_sep
+#         
+#         return(second) # Return the string
+#       }
+#     }
+#   } else { # Second is NA, First is not
+#     if (first == "") { # Checks if first could be empty
+#       return(NA) # If so, return NA
+#     } else { 
+#       # first is neither NA nor "", but we need to check if it 
+#       # consists of multiple terms or not:
+#       if (str_detect(str_squish(first), from_sep) == F) { # Is from_sep in first
+#         return(first)
+#       } else { # from_sep is in first
+#         # Check if "|" is used as separator. If so, given that "|" is
+#         # a special character, we need to putt "\\" in front:
+#         if (from_sep == "|") {
+#           first <- first %>% str_split(pattern = "\\|") # splits (at "|") into list of vectors
+#         } else { # The separator is something else:
+#           first <- first %>% str_split(pattern = from_sep) # splits (at from_sep) into list of vectors
+#         }
+#         first <- first %>%
+#           base::unlist() %>% # Unlist to get the single vector
+#           base::unique() %>% # Keep only the unique elements of the vector
+#           str_flatten(collapse = to_sep) # Flattens the vector to a single string, with each element separated by the to_sep
+#         
+#         return(first) # Return the string
+#       }
+#     }
+#   }
+# }
 
 
 
@@ -277,15 +279,17 @@ if ("ensembl.con" %in% ls() == F) {
 # Get IDs from other data bases, using the biomaRt package:
 # OBS! This data frame will contain duplications, because
 # some proteins may have multiple IDs within the same data bases.
+# Moreover, you can't get all identifiers in a single step,
+# so here we create two data frames, which we merge later on.
 multiple_ids1 <- getBM(
   attributes = c(
-    "uniprotswissprot",
-    "entrezgene_id", 
-    "external_gene_name",
-    "ensembl_gene_id"
+    "uniprotswissprot", # Uniprot IDs - Swiss-Prot (i.e. Reviewed content)
+    "entrezgene_id",  # Entrez (i.e. NCBI) gene ID/number
+    "external_gene_name", # Common gene name
+    "ensembl_gene_id" # Ensemble gene ID
     ), 
-  filters = "uniprotswissprot",
-  values = input_data_nodes$UniprotKB,
+  filters = "uniprotswissprot", # Map using these IDs (here: Uniprot IDs)
+  values = input_data_nodes$UniprotKB, # The column the IDs are found
   mart = ensembl.con) %>% 
   mutate(dup = duplicated(uniprotswissprot)) %>% # OBS! Because Ensemble have multiple IDs per protein, we choose to only keep one
   filter(dup != T) %>% 
@@ -295,16 +299,14 @@ multiple_ids1 <- getBM(
 multiple_ids2 <- getBM(
   attributes = c(
     "uniprotswissprot", # Uniprot ID, from the Swiss-Prot data base
-    "hgnc_id",
-    "hgnc_symbol"), # I.e. Gene symbol as reported in HGCN
+    "hgnc_id", # HGNC ID
+    "hgnc_symbol"), # I.e. Gene symbol as reported in HGNC
   filters = "uniprotswissprot",
   values = input_data_nodes$UniprotKB,
-  mart = ensembl.con) %>% 
-  mutate(dup = duplicated(uniprotswissprot)) %>% # OBS! Because Ensemble have multiple IDs per protein, we choose to only keep one
-  filter(dup != T) %>% 
-  dplyr::select(-dup)
+  mart = ensembl.con)
 
 
+# Merge the two data frames into one data frame:
 multiple_ids <- left_join(multiple_ids1, multiple_ids2, 
                           by=c("uniprotswissprot" = "uniprotswissprot"))
 
@@ -323,10 +325,16 @@ raw_gene_syn_df <- getBM(
   values = input_data_nodes$UniprotKB,
   mart = ensembl.con)
 
+
+# Use the raw_gene_syn_df to create another data frame with only
+# one row per Uniprot ID, and all the synonyms combined in a single 
+# string per Uniprot ID:
 fin_gene_syn_df <- raw_gene_syn_df %>% 
   group_by(uniprotswissprot) %>% 
-  summarise(gene_synonyms = paste0(external_synonym, collapse = "|")) %>% 
-  filter(uniprotswissprot %in% input_data_nodes$UniprotKB)
+  summarise(gene_synonyms_BioMart = 
+              paste0(external_synonym, 
+                     collapse = "|")) #%>% 
+  #filter(uniprotswissprot %in% input_data_nodes$UniprotKB)
 
 # # Takes the raw_gene_syn_df, and combine all the synonym for every Uniprot ID
 # # to a single row:
@@ -361,8 +369,6 @@ BioMart_df <- left_join(
 
 ## Tidying up:
 rm(multiple_ids,
-   multiple_ids1,
-   multiple_ids2,
    raw_gene_syn_df, 
    fin_gene_syn_df
    )
@@ -381,6 +387,8 @@ if ("Swiss_Prot.tsv" %in% dir()) {
 } else {
   cat("OBS! The Swiss_Prot file is not in working directory. Fetching it from web, but it takes a while")
   swiss_prot <- read.delim("https://rest.uniprot.org/uniprotkb/stream?fields=accession%2Cid%2Cprotein_name%2Cgene_names%2Cgene_synonym&format=tsv&query=%28%2A%29%20AND%20%28reviewed%3Atrue%29%20AND%20%28model_organism%3A9606%29")
+  # Download the file to the directory:
+  write.csv(swiss_prot, str_c(getwd(), "/Swiss_Prot.tsv"), row.names = F)
 }
 
 
@@ -392,9 +400,8 @@ Uniprot_IDs <- input_data_nodes %>%
 
 
 
-##########
 # The strings may contain information about what the result of
-# protein cleavage is. This function ditermine what should be done
+# protein cleavage is. This function determine what should be done
 # with that information:
 cleavage_info <- function(string, remove_or_extract) {
   if (str_detect(string, "\\[Cleaved into: ")) {
@@ -459,6 +466,7 @@ str_change_sep <- function(string) {
 
 
 # Function to remove duplicates in a string:
+#str_rm_duplicates <- function(string, sep, collapse) {
 str_rm_duplicates <- function(string, sep, collapse) {
   # Handle situations where there is only a single term, or 
   # the "string" is NA:
@@ -514,8 +522,7 @@ str_rm_duplicates <- function(string, sep, collapse) {
   return(string)
 }
 
-
-# Vectorize the function:
+# Vectorize the function str_rm_duplicates:
 str_rm_duplicates_vec <- Vectorize(str_rm_duplicates, "string")
 
 
@@ -539,7 +546,7 @@ str_rm_ECnumber <- function(string) {
 
 
 # Subset of swiss_prot df, with only IDs equal to those in our input data:
-sub_df <- swiss_prot %>% 
+Swiss_df <- swiss_prot %>% 
   filter(Entry %in% Uniprot_IDs) %>% 
   group_by(Entry) %>% 
   mutate( # Change the content of columns:
@@ -563,12 +570,6 @@ sub_df <- swiss_prot %>%
         ),
         Protein.names
       ),
-    # Protein_name =
-    #   str_get_protName(
-    #     Protein.names # Input values from this column
-    #     ),
-    # Construct a new column with only synonyms, if any, meaning that
-    # the protein name is excluded:
     Protein_synonyms =
       ifelse(
         str_detect(Protein.names, "\\|"), # IF statement
@@ -589,7 +590,7 @@ sub_df <- swiss_prot %>%
     Gene_synonyms = str_c(Gene.Names, Gene.Names..synonym.,
                           sep = " "),
     # Remove duplicated synonyms:
-    Gene_synonyms = str_rm_duplicates(Gene_synonyms, 
+    Gene_synonyms = str_rm_duplicates_vec(Gene_synonyms, 
                                       sep = " ",
                                       collapse = "|"),
     # Remove posible "|" at end of string:
@@ -605,7 +606,7 @@ sub_df <- swiss_prot %>%
                 "gene_synonyms_swiss"=Gene_synonyms)
 
 
-#########
+
 
 
 ######
@@ -699,27 +700,14 @@ sub_df <- swiss_prot %>%
 #####
 
 # Create a new data frame with only the interesting to us:
-Swiss_df <- sub_df %>% 
-  dplyr::select(Entry, 
-                protein_name, 
-                protein_synonyms_swiss,
-                gene_synonyms_swiss,
-                Cleaved)
+# Swiss_df <- sub_df %>% 
+#   dplyr::select(Entry, 
+#                 protein_name, 
+#                 protein_synonyms_swiss,
+#                 gene_synonyms_swiss,
+#                 Cleaved)
 
 
-## Tidy up:
-rm(
-  Uniprot_IDs,
-  sub_df,
-  string, 
-  p_name, 
-  syn, 
-  ent_name, 
-  g_syn,
-  i,
-  flag,
-  row
-)
 
 ## Double merge, the BioMart_df and Swiss_df, to the input_data_nodes df:
 merge_df <- input_data_nodes %>% 
@@ -731,39 +719,27 @@ merge_df <- input_data_nodes %>%
 
 
 merge_df <- merge_df %>% 
-  mutate(final_gene_syn = 
+  mutate(gene_synonyms = 
            str_c(gene_synonyms_BioMart, 
                  gene_synonyms_swiss,
                  sep = "|"),
-         final_gene_syn = ifelse(
-           str_starts(final_gene_syn, "\\|"),
-           str_sub(final_gene_syn, 2),
+         gene_synonyms = ifelse(
+           str_starts(gene_synonyms, "\\|"),
+           str_sub(gene_synonyms, 2),
            ifelse(
-             str_ends(final_gene_syn, "\\|"),
-             str_sub(final_gene_syn, -2),
-             final_gene_syn
+             str_ends(gene_synonyms, "\\|"),
+             str_sub(gene_synonyms, -2),
+             gene_synonyms
            )
          ),
-         final_gene_syn = 
-           str_rm_duplicates_vec(final_gene_syn,
+         gene_synonyms = 
+           str_rm_duplicates_vec(gene_synonyms,
                              sep = "|",
                              collapse = "|"))
-# Create a new column for the final version of gene synonyms,
-# and fill it with the function col_splice_to_string():
 
-# merge_df$final_gene_syn <- NA
-# for (i in 1:nrow(merge_df)) {
-#   if (merge_df[i, "UniprotKB"] != "") {
-#     merge_df[i, "final_gene_syn"] <- col_splice_to_string(
-#       df = merge_df,
-#       row = i,
-#       col1 = "gene_synonyms_BioMart",
-#       col2 = "gene_synonyms_swiss",
-#       from_sep = "|",
-#       to_sep = "|"
-#     )
-#   }
-# }
+# Tidy up:
+rm(Swiss_df,
+   BioMart_df)
 
 
 
@@ -775,8 +751,7 @@ finished_df <- merge_df %>%
     NCBI_gene = fill_cells(NCBI_gene, entrezgene_id),
     Ensembl = fill_cells(Ensembl, ensembl_gene_id),
     HGNC = fill_cells(HGNC, hgnc_id),
-    Origin = ifelse(is.na(Origin), "added", ifelse(Origin == "", "added", Origin)),
-    Curator = str_to_title(Curator)
+    Origin = ifelse(is.na(Origin), "added", ifelse(Origin == "", "added", Origin))
     ) %>% 
   dplyr::select(
     id,
@@ -784,7 +759,7 @@ finished_df <- merge_df %>%
     UniprotKB,
     hgnc_symbol,
     molecule_type,
-    "gene_synonyms" = final_gene_syn,
+    gene_synonyms,
     "protein_synonyms" = protein_synonyms_swiss,
     Receptor_or_Ligand,
     Interleukine.1.signaling,
