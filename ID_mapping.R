@@ -35,7 +35,7 @@ if (Sys.info()["nodename"] == "MARIUSPC") { # Marius 1
 } else if (Sys.info()["nodename"] == "penguin") { # Marius 2
   setwd("/mnt/chromeos/MyFiles/Downloads")
 } else if (Sys.info()["nodename"] == "dhcp-10-22-28-162.wlan.ntnu.no") { # Jann
-  setwd("~/Desktop/run everything")
+  setwd("/Users/Jann/Library/CloudStorage/OneDrive-SharedLibraries-NTNU/o365_System Bio - group 6 - Documents/General")
 } else if (Sys.info()["nodename"] == "LAPTOP-3BEG4HPK") { # Vibeke
   setwd("C:/Users/Vibeke/Downloads")
 }
@@ -364,7 +364,7 @@ if ("Swiss_Prot.tsv" %in% dir()) {
   cat("OBS! The Swiss_Prot file is not in working directory. Fetching it from web, but it takes a while")
   swiss_prot <- read.delim("https://rest.uniprot.org/uniprotkb/stream?fields=accession%2Cid%2Cprotein_name%2Cgene_names%2Cgene_synonym&format=tsv&query=%28%2A%29%20AND%20%28reviewed%3Atrue%29%20AND%20%28model_organism%3A9606%29")
   # Download the file to the directory:
-  write.csv(swiss_prot, str_c(getwd(), "/Swiss_Prot.tsv"), row.names = F)
+  write_tsv(swiss_prot, str_c(getwd(), "/Swiss_Prot.tsv"))
 }
 
 
