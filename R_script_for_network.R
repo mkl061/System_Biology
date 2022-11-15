@@ -247,5 +247,18 @@ if (my.style %in% getVisualStyleNames() == F) {
 setVisualStyle(my.style)
 lockNodeDimensions(FALSE, my.style)
 
+
+# Create a style for interpreting expression data:
+my.style2 <- "Group6_omics_style"
+copyVisualStyle(my.style, my.style2)
+setNodeColorDefault("#bcbcbc", my.style2)
+setNodeShapeMapping(table.column = "molecule_type",
+                    table.column.values = c("protein", "TF", "gene"),
+                    shapes = c("ROUND_RECTANGLE", "TRIANGLE", "ELLIPSE"),
+                    style.name = my.style2)
+setNodeColorMapping(table.column = "logFC_GSE14905",
+                          style.name = my.style2)
+
+
 # Saves the file, with overwrite previalages:
 saveSession("Updated_network")
