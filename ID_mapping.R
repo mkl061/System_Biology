@@ -42,39 +42,6 @@ if (Sys.info()["nodename"] == "MARIUSPC") { # Marius 1
 
 
 ### Custom function ----
-# # Splits apart a string at "|", removes duplicates, and splice it together again:
-# str_rm_duplicates <- function(string) {
-#   string <- string %>% 
-#     str_split(pattern = "\\|") %>% # Splits the string at "|", into list
-#     unlist() %>% # Unlist to convert to vector
-#     base::unique() %>%  # Keep only the unique elements (i.e. removes duplicates)
-#     paste0(collapse = "|") # Collapse all elements (seperated by "|") into single string 
-#   return(string)
-# }
-# 
-# str_rm_NA <- function(string) {
-#   string <- string %>% 
-#     str_split(pattern = "\\|") %>%
-#     unlist() %>% 
-#     .[. != "NA"] %>% 
-#     paste0(collapse = "|")
-#   return(string)
-# }
-
-
-
-
-# remove_whitespaces <- function(df) {
-#   for (col in 1:ncol(df)) {
-#     if (is.character(df[,col])) { # Checks if column is of character type
-#       df[,col] <- sapply(
-#         df[,col],
-#         str_squish) # Removes white spaces in front, back and reduce multiple spaces to a single one
-#     }
-#   }
-#   return(df)
-# }
-
 
 # Function that looks through all character columns, and removes white 
 # spaces at front and end, and convert multiple spaces to single spaces:
@@ -105,105 +72,6 @@ str_rev_in_vec <- function(vec) {
 
 
 
-# Function to collapse strings of two different columns (same row) with
-# specified separator:
-# col_splice_to_string <- function(df, row, col1, col2, from_sep, to_sep) {
-#   first <- df[row, col1] 
-#   second <- df[row, col2] 
-#   
-#   first_NA <- is.na(first)
-#   second_NA <- is.na(second)
-#   
-#   if (first_NA == F && second_NA == F) { # None are NA
-#     # None of the variables are equal to NA.
-#     # However, they may be equal to "" (i.e. they may be empty strings)
-#     
-#     # Create variables, holding either TRUE or FALSE, depending on
-#     # if the input variables are equal to "" or not:
-#     first_empty <- first == ""
-#     second_empty <- second == ""
-#     
-#     if (first_empty == F && second_empty == F) { # None are empty (i.e. "")
-#       # None of them are empty, then we can proceed to combining them:
-#       final <- str_flatten(c(first, second), collapse = from_sep)
-#       # Check if "|" is used as separator. If so, given that "|" is
-#       # a special character, we need to putt "\\" in front:
-#       if (from_sep == "|") {
-#         final <- final %>% str_split(pattern = "\\|") # splits (at "|") into list of vectors
-#       } else { # The separator is something else:
-#         final <- final %>% str_split(pattern = from_sep) # splits (at from_sep) into list of vectors
-#       }
-#       final <- final %>%
-#         base::unlist() %>% # Unlist to get the single vector
-#         base::unique() %>% # Keep only the unique elements of the vector
-#         str_flatten(collapse = to_sep) # Flattens the vector to a single string, with each element separated by the to_sep
-#       
-#       return(final) # Return the string
-#     } else if (first_empty == T && second_empty == T) {
-#       return(NA)
-#     } else if (first_empty == T) { # First is empty, but not Second
-#       return(second)
-#     } else { # Second is empty, but first is not
-#       return(first)
-#     }
-#     
-#     
-#   } else if (first_NA == T && second_NA == T) { # Both are NA
-#     return(NA)
-#   } else if (first_NA == T) { # First is NA, Second is not
-#     if (second == "") { # Checks if Second could be empty
-#       return(NA) # If so, return NA
-#     } else { 
-#       # Second is neither NA nor "", but we need to check if it 
-#       # consists of multiple terms or not:
-#       if (str_detect(str_squish(second), from_sep) == F) { # Is from_sep in Second
-#         return(second)
-#       } else { # from_sep is in Second
-#         # Check if "|" is used as separator. If so, given that "|" is
-#         # a special character, we need to putt "\\" in front:
-#         if (from_sep == "|") {
-#           second <- second %>% str_split(pattern = "\\|") # splits (at "|") into list of vectors
-#         } else { # The separator is something else:
-#           second <- second %>% str_split(pattern = from_sep) # splits (at from_sep) into list of vectors
-#         }
-#         second <- second %>%
-#           base::unlist() %>% # Unlist to get the single vector
-#           base::unique() %>% # Keep only the unique elements of the vector
-#           str_flatten(collapse = to_sep) # Flattens the vector to a single string, with each element separated by the to_sep
-#         
-#         return(second) # Return the string
-#       }
-#     }
-#   } else { # Second is NA, First is not
-#     if (first == "") { # Checks if first could be empty
-#       return(NA) # If so, return NA
-#     } else { 
-#       # first is neither NA nor "", but we need to check if it 
-#       # consists of multiple terms or not:
-#       if (str_detect(str_squish(first), from_sep) == F) { # Is from_sep in first
-#         return(first)
-#       } else { # from_sep is in first
-#         # Check if "|" is used as separator. If so, given that "|" is
-#         # a special character, we need to putt "\\" in front:
-#         if (from_sep == "|") {
-#           first <- first %>% str_split(pattern = "\\|") # splits (at "|") into list of vectors
-#         } else { # The separator is something else:
-#           first <- first %>% str_split(pattern = from_sep) # splits (at from_sep) into list of vectors
-#         }
-#         first <- first %>%
-#           base::unlist() %>% # Unlist to get the single vector
-#           base::unique() %>% # Keep only the unique elements of the vector
-#           str_flatten(collapse = to_sep) # Flattens the vector to a single string, with each element separated by the to_sep
-#         
-#         return(first) # Return the string
-#       }
-#     }
-#   }
-# }
-
-
-
-
 # Function that will be used to fill cells of one column if the cell contain
 # either NA or "": 
 fill_cells <- function(to_col, from_col) {
@@ -226,7 +94,6 @@ fill_cells <- function(to_col, from_col) {
 ## Nodes:
 
 # Read files:
-#input_data_nodes <- read.csv("nodes.csv")
 files <- dir(pattern = ".xlsx")
 files <- files[str_starts(files, "Project_workbook")]
 mtimes <- file.mtime(files) %>% order()
@@ -245,7 +112,6 @@ input_data_nodes <- input_data_nodes %>%
 
 
 ## Edges:
-#input_data_edges <- read.csv("edges.csv")
 
 input_data_edges <- read_excel(file, sheet = "edges")
 
@@ -834,6 +700,6 @@ df <- newest_nodes %>%
 newest_edges <- bind_rows(newest_edges, df) %>% 
   distinct(.keep_all = T)
 
-
+# Creating, or updating, new CSV files:
 write.csv(newest_nodes, str_c(getwd(), "/new_nodes.csv"), row.names = F)
 write.csv(newest_edges, str_c(getwd(), "/new_edges.csv"), row.names = F)

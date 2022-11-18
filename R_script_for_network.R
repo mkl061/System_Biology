@@ -21,7 +21,7 @@ if (!require("tidyverse", quietly = T)) {
 
 
 ### Functions: ----
-# Fucntion that looks throught all characther columns, and removes
+# Function that looks through all character columns, and removes
 # white spaces at front and end, and convert multiple spaces to single spaces:
 remove_whitespaces <- function(df) {
   for (col in 1:ncol(df)) {
